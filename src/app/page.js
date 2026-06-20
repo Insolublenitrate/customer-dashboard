@@ -651,7 +651,7 @@ export default function Dashboard() {
           <div className="loader"></div>
         )}
       </div>
-    ) : (
+    ) : viewMode === 'territories' ? (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
         {/* Manager Selector */}
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
