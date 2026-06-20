@@ -312,7 +312,7 @@ export default function Dashboard() {
       )}
 
       {/* View Toggle */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
+      <div className="view-toggle">
         <button 
           className={`btn ${viewMode === 'database' ? 'glass' : ''}`}
           style={{ 
@@ -358,7 +358,7 @@ export default function Dashboard() {
       {viewMode === 'database' ? (
         <>
           {/* Tabs */}
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+          <div className="nav-tabs">
         <button 
           className={`btn ${activeTab === 'all' ? 'glass' : ''}`}
           style={{ background: activeTab === 'all' ? 'rgba(255,255,255,0.1)' : 'transparent', border: 'none', color: activeTab === 'all' ? '#fff' : '#94a3b8' }}
@@ -555,7 +555,7 @@ export default function Dashboard() {
       </div>
       </>
     ) : viewMode === 'analytics' ? (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+      <div className="grid-responsive-2">
         {analyticsData ? (
           <>
             <div className="glass glass-card" style={{ padding: '1.5rem' }}>
@@ -652,7 +652,7 @@ export default function Dashboard() {
         )}
       </div>
     ) : viewMode === 'territories' ? (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
+      <div className="grid-responsive-1" style={{ display: 'grid', gap: '2rem' }}>
         {/* Manager Selector */}
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           <label style={{ color: '#94a3b8' }}>Select Manager View:</label>
@@ -667,7 +667,7 @@ export default function Dashboard() {
         {territoryData ? (
           <>
           {/* Top Level Maps & Progression */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+          <div className="grid-responsive-2">
             <div className="glass glass-card" style={{ padding: '1.5rem' }}>
               <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Cumulative YTD Revenue</h3>
               <div style={{ height: '300px' }}>
@@ -777,7 +777,7 @@ export default function Dashboard() {
         )}
       </div>
     ) : (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
+      <div className="grid-responsive-1" style={{ display: 'grid', gap: '2rem' }}>
         {territoryData ? (
           <>
           {/* Top-level KPIs */}
@@ -800,7 +800,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+          <div className="grid-responsive-2">
             {/* Pipeline vs Won Stacked Bar */}
             <div className="glass glass-card" style={{ padding: '1.5rem' }}>
               <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Pipeline vs. Closed Won (Count)</h3>
