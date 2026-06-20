@@ -5,7 +5,7 @@ import {
   Building2, Users, DollarSign, Cpu, 
   Search, ChevronLeft, ChevronRight, Settings2, Send, X, Plus, Edit2
 } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
@@ -508,7 +508,11 @@ export default function Dashboard() {
                       <XAxis type="number" tickFormatter={(val) => `$${val/1000}k`} stroke="#94a3b8" />
                       <YAxis dataKey="name" type="category" width={80} stroke="#94a3b8" />
                       <Tooltip formatter={(val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val)} contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
-                      <Bar dataKey="avg_value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="avg_value" radius={[0, 4, 4, 0]}>
+                        {analyticsData.valueByMachine.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'][index % 5]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -522,7 +526,18 @@ export default function Dashboard() {
                       <XAxis dataKey="name" stroke="#94a3b8" />
                       <YAxis stroke="#94a3b8" />
                       <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
-                      <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        {analyticsData.funnelData.map((entry, index) => {
+                          let color = '#94a3b8';
+                          if (entry.name === 'New') color = '#3b82f6';
+                          if (entry.name === 'Contacted') color = '#f59e0b';
+                          if (entry.name === 'Qualified') color = '#8b5cf6';
+                          if (entry.name === 'Proposal') color = '#ec4899';
+                          if (entry.name === 'Won') color = '#10b981';
+                          if (entry.name === 'Lost') color = '#ef4444';
+                          return <Cell key={`cell-${index}`} fill={color} />
+                        })}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -536,7 +551,11 @@ export default function Dashboard() {
                       <XAxis dataKey="name" stroke="#94a3b8" />
                       <YAxis stroke="#94a3b8" />
                       <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
-                      <Bar dataKey="won_deals" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="won_deals" radius={[4, 4, 0, 0]}>
+                        {analyticsData.statesWon.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={['#14b8a6', '#f43f5e', '#6366f1', '#eab308', '#22c55e'][index % 5]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
