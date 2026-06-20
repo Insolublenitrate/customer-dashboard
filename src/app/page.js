@@ -478,9 +478,10 @@ export default function Dashboard() {
             </button>
           </div>
         )}
-        </>
-      ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+      </div>
+      </>
+    ) : (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
           {analyticsData ? (
             <>
               <div className="glass glass-card" style={{ padding: '1.5rem' }}>
