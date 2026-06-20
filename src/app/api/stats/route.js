@@ -1,27 +1,29 @@
 import { NextResponse } from 'next/server'
-import { openDb } from '@/lib/db'
+import { db } from '@vercel/postgres'
 
 export async function GET() {
   try {
-    const db = await openDb()
+    const client = await db.connect()
     
     // Total leads
-    const totalLeads = await db.get('SELECT COUNT(*) as count FROM leads')
+    const totalLeadsResult = await client.query('SELECT COUNT(*) as count FROM leads')
     
     // Total Order Value
-    const totalOrderValue = await db.get('SELECT SUM(order_value) as sum FROM leads')
+    const totalOrderValueResult = await client.query('SELECT SUM(order_value) as sum FROM leads')
     
     // Top States
-    const topStates = await db.all('SELECT state, COUNT(*) as count FROM leads WHERE state IS NOT NULL GROUP BY state ORDER BY count DESC LIMIT 5')
+    const topStatesResult = await client.query('SELECT state, COUNT(*) as count FROM leads WHERE state IS NOT NULL GROUP BY state ORDER BY count DESC LIMIT 5')
     
     // Top Machines
-    const topMachines = await db.all('SELECT machine_make, COUNT(*) as count FROM leads WHERE machine_make IS NOT NULL AND machine_make != "Unknown" GROUP BY machine_make ORDER BY count DESC LIMIT 5')
+    const topMachinesResult = await client.query("SELECT machine_make, COUNT(*) as count FROM leads WHERE machine_make IS NOT NULL AND machine_make != 'Unknown' GROUP BY machine_make ORDER BY count DESC LIMIT 5")
+
+    client.release()
 
     return NextResponse.json({
-      totalLeads: totalLeads.count,
-      totalOrderValue: totalOrderValue.sum,
-      topStates,
-      topMachines
+      totalLeads: parseInt(totalLeadsResult.rows[0].count),
+      totalOrderValue: parseFloat(totalOrderValueResult.rows[0].sum) || 0,
+      topStates: topStatesResult.rows,
+      topMachines: topMachinesResult.rows
     })
   } catch (error) {
     console.error('Database Error:', error)
