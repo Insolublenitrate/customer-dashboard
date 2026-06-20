@@ -81,12 +81,42 @@ export async function GET(request) {
       LIMIT 5
     `, params);
 
+    // 4. Pipeline Value by Stage
+    const pipelineResult = await client.query(`
+      SELECT status, SUM(order_value) as total_value 
+      FROM leads 
+      WHERE ${filterSql}
+      GROUP BY status
+    `, params);
+
+    const pipelineCounts = {};
+    pipelineResult.rows.forEach(r => { pipelineCounts[r.status] = parseFloat(r.total_value) || 0 });
+    const pipelineData = [
+      { name: 'New', value: pipelineCounts['New'] || 0 },
+      { name: 'Contacted', value: pipelineCounts['Contacted'] || 0 },
+      { name: 'Qualified', value: pipelineCounts['Qualified'] || 0 },
+      { name: 'Proposal', value: pipelineCounts['Proposal'] || 0 },
+      { name: 'Won', value: pipelineCounts['Won'] || 0 }
+    ];
+
+    // 5. Control Systems Breakdown
+    const controlResult = await client.query(`
+      SELECT control as name, COUNT(*) as count 
+      FROM leads 
+      WHERE control IS NOT NULL AND control != 'Unknown' AND ${filterSql}
+      GROUP BY control 
+      ORDER BY count DESC 
+      LIMIT 5
+    `, params);
+
     client.release()
 
     return NextResponse.json({
       valueByMachine: avgValueByMachine.rows.map(r => ({ ...r, avg_value: parseFloat(r.avg_value) })),
       funnelData,
-      statesWon: topStatesWon.rows.map(r => ({ ...r, won_deals: parseInt(r.won_deals) }))
+      statesWon: topStatesWon.rows.map(r => ({ ...r, won_deals: parseInt(r.won_deals) })),
+      pipelineData,
+      controlData: controlResult.rows.map(r => ({ ...r, count: parseInt(r.count) }))
     })
   } catch (error) {
     console.error('Analytics Database Error:', error)

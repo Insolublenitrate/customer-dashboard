@@ -5,12 +5,13 @@ import {
   Building2, Users, DollarSign, Cpu, 
   Search, ChevronLeft, ChevronRight, Settings2, Send, X, Plus, Edit2
 } from 'lucide-react'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, AreaChart, Area, PieChart, Pie, Legend } from 'recharts'
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
   const [analyticsData, setAnalyticsData] = useState(null)
-  const [viewMode, setViewMode] = useState('database') // 'database' or 'analytics'
+  const [territoryData, setTerritoryData] = useState(null)
+  const [viewMode, setViewMode] = useState('database') // 'database', 'analytics', 'territories'
   const [leads, setLeads] = useState([])
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 })
   const [loading, setLoading] = useState(true)
@@ -24,6 +25,7 @@ export default function Dashboard() {
   const [search, setSearch] = useState('')
   const [stateFilter, setStateFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [regionalManagerFilter, setRegionalManagerFilter] = useState('')
   const [activeTab, setActiveTab] = useState('all') // 'all', 'with_email', 'high_value'
   
   // Sorting
@@ -62,7 +64,8 @@ export default function Dashboard() {
       search,
       state: stateFilter,
       tabFilter: activeTab,
-      statusFilter
+      statusFilter,
+      regionalManager: regionalManagerFilter
     })
     
     fetch(`/api/analytics?${params}`)
@@ -84,6 +87,7 @@ export default function Dashboard() {
       state: stateFilter,
       tabFilter: activeTab,
       statusFilter,
+      regionalManager: regionalManagerFilter,
       sortField,
       sortDir
     })
@@ -101,10 +105,20 @@ export default function Dashboard() {
       })
   }
 
+  const fetchTerritories = () => {
+    fetch('/api/territories')
+      .then(res => res.json())
+      .then(data => setTerritoryData(data.territories))
+      .catch(err => console.error("Failed to load territories:", err))
+  }
+
   useEffect(() => {
     fetchLeads()
     fetchAnalytics()
-  }, [pagination.page, search, stateFilter, activeTab, statusFilter, sortField, sortDir])
+    if (viewMode === 'territories' && !territoryData) {
+      fetchTerritories()
+    }
+  }, [pagination.page, search, stateFilter, activeTab, statusFilter, regionalManagerFilter, sortField, sortDir, viewMode])
 
   const handleSearch = (e) => {
     setSearch(e.target.value)
@@ -298,17 +312,33 @@ export default function Dashboard() {
       <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
         <button 
           className={`btn ${viewMode === 'database' ? 'glass' : ''}`}
-          style={{ background: viewMode === 'database' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', border: viewMode === 'database' ? '1px solid #3b82f6' : 'none', color: viewMode === 'database' ? '#fff' : '#94a3b8' }}
+          style={{ 
+            backgroundColor: viewMode === 'database' ? 'var(--card-bg)' : 'transparent',
+            color: viewMode === 'database' ? 'white' : '#94a3b8' 
+          }}
           onClick={() => setViewMode('database')}
         >
           Lead Database
         </button>
         <button 
           className={`btn ${viewMode === 'analytics' ? 'glass' : ''}`}
-          style={{ background: viewMode === 'analytics' ? 'rgba(16, 185, 129, 0.2)' : 'transparent', border: viewMode === 'analytics' ? '1px solid #10b981' : 'none', color: viewMode === 'analytics' ? '#fff' : '#94a3b8' }}
+          style={{ 
+            backgroundColor: viewMode === 'analytics' ? 'var(--card-bg)' : 'transparent',
+            color: viewMode === 'analytics' ? 'white' : '#94a3b8' 
+          }}
           onClick={() => setViewMode('analytics')}
         >
           Analytics & Patterns
+        </button>
+        <button 
+          className={`btn ${viewMode === 'territories' ? 'glass' : ''}`}
+          style={{ 
+            backgroundColor: viewMode === 'territories' ? 'var(--card-bg)' : 'transparent',
+            color: viewMode === 'territories' ? 'white' : '#94a3b8' 
+          }}
+          onClick={() => { setViewMode('territories'); fetchTerritories(); }}
+        >
+          Territory Performance
         </button>
       </div>
 
@@ -375,6 +405,17 @@ export default function Dashboard() {
             <option value="Won">Won</option>
             <option value="Lost">Lost</option>
           </select>
+          <select 
+            className="input" 
+            value={regionalManagerFilter} 
+            onChange={(e) => { setRegionalManagerFilter(e.target.value); setPagination(p => ({ ...p, page: 1 })) }}
+          >
+            <option value="">All Regions</option>
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(num => (
+              <option key={num} value={`Regional Sales Manager ${num}`}>RSM {num}</option>
+            ))}
+            <option value="Unassigned">Unassigned</option>
+          </select>
         </div>
 
         {loading ? (
@@ -387,6 +428,7 @@ export default function Dashboard() {
                   <th onClick={() => handleSort('company')} style={{ cursor: 'pointer' }}>Company {renderSortIndicator('company')}</th>
                   <th onClick={() => handleSort('state')} style={{ cursor: 'pointer' }}>Location {renderSortIndicator('state')}</th>
                   <th onClick={() => handleSort('contact_name')} style={{ cursor: 'pointer' }}>Contact {renderSortIndicator('contact_name')}</th>
+                  <th onClick={() => handleSort('regional_manager')} style={{ cursor: 'pointer' }}>Region {renderSortIndicator('regional_manager')}</th>
                   <th onClick={() => handleSort('machine_make')} style={{ cursor: 'pointer' }}>Machine Info {renderSortIndicator('machine_make')}</th>
                   <th onClick={() => handleSort('order_value')} style={{ cursor: 'pointer' }}>Value {renderSortIndicator('order_value')}</th>
                   <th onClick={() => handleSort('lead_score')} style={{ cursor: 'pointer' }}>Score {renderSortIndicator('lead_score')}</th>
@@ -408,6 +450,9 @@ export default function Dashboard() {
                     <td>
                       <div>{lead.contact_name}</div>
                       <div style={{ color: '#94a3b8' }}>{lead.email ? lead.email : lead.contact_phone}</div>
+                    </td>
+                    <td>
+                      <div style={{ color: 'var(--foreground)' }}>{lead.regional_manager || 'Unassigned'}</div>
                     </td>
                     <td>
                       {lead.machine_make ? (
@@ -496,78 +541,138 @@ export default function Dashboard() {
         )}
       </div>
       </>
-    ) : (
+    ) : viewMode === 'analytics' ? (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-          {analyticsData ? (
-            <>
-              <div className="glass glass-card" style={{ padding: '1.5rem' }}>
-                <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Average Value by Machine Type</h3>
-                <div style={{ height: '300px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analyticsData.valueByMachine} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <XAxis type="number" tickFormatter={(val) => `$${val/1000}k`} stroke="#94a3b8" />
-                      <YAxis dataKey="name" type="category" width={80} stroke="#94a3b8" />
-                      <Tooltip formatter={(val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val)} contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
-                      <Bar dataKey="avg_value" radius={[0, 4, 4, 0]}>
-                        {analyticsData.valueByMachine.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'][index % 5]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+        {analyticsData ? (
+          <>
+            <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Average Value by Machine Type</h3>
+              <div style={{ height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart cx="50%" cy="50%" outerRadius="80%" data={analyticsData.valueByMachine}>
+                    <PolarGrid stroke="#334155" />
+                    <PolarAngleAxis dataKey="name" tick={{ fill: '#94a3b8', fontSize: 12 }} />
+                    <PolarRadiusAxis angle={30} domain={[0, 'auto']} tick={{ fill: '#94a3b8' }} tickFormatter={(val) => `$${val/1000}k`}/>
+                    <Radar name="Value" dataKey="avg_value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.6} />
+                    <Tooltip formatter={(val) => formatCurrency(val)} contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                  </RadarChart>
+                </ResponsiveContainer>
               </div>
+            </div>
 
-              <div className="glass glass-card" style={{ padding: '1.5rem' }}>
-                <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Sales Funnel Drop-off</h3>
-                <div style={{ height: '300px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analyticsData.funnelData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <XAxis dataKey="name" stroke="#94a3b8" />
-                      <YAxis stroke="#94a3b8" />
-                      <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
-                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
-                        {analyticsData.funnelData.map((entry, index) => {
-                          let color = '#94a3b8';
-                          if (entry.name === 'New') color = '#3b82f6';
-                          if (entry.name === 'Contacted') color = '#f59e0b';
-                          if (entry.name === 'Qualified') color = '#8b5cf6';
-                          if (entry.name === 'Proposal') color = '#ec4899';
-                          if (entry.name === 'Won') color = '#10b981';
-                          if (entry.name === 'Lost') color = '#ef4444';
-                          return <Cell key={`cell-${index}`} fill={color} />
-                        })}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+            <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Sales Funnel Drop-off</h3>
+              <div style={{ height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={analyticsData.funnelData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorFunnel" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="name" stroke="#94a3b8" />
+                    <YAxis stroke="#94a3b8" />
+                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                    <Area type="monotone" dataKey="value" stroke="#10b981" fillOpacity={1} fill="url(#colorFunnel)" />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
+            </div>
 
-              <div className="glass glass-card" style={{ padding: '1.5rem' }}>
-                <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Top Regions by Deals Won</h3>
-                <div style={{ height: '300px' }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={analyticsData.statesWon} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                      <XAxis dataKey="name" stroke="#94a3b8" />
-                      <YAxis stroke="#94a3b8" />
-                      <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
-                      <Bar dataKey="won_deals" radius={[4, 4, 0, 0]}>
-                        {analyticsData.statesWon.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={['#14b8a6', '#f43f5e', '#6366f1', '#eab308', '#22c55e'][index % 5]} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+            <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Pipeline Value by Stage</h3>
+              <div style={{ height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={analyticsData.pipelineData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorPipeline" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="name" stroke="#94a3b8" />
+                    <YAxis stroke="#94a3b8" tickFormatter={(val) => `$${val/1000}k`} />
+                    <Tooltip formatter={(val) => formatCurrency(val)} contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                    <Area type="monotone" dataKey="value" stroke="#3b82f6" fillOpacity={1} fill="url(#colorPipeline)" />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-            </>
-          ) : (
-            <div className="loader"></div>
-          )}
-        </div>
-      )}
+            </div>
 
-      {/* Add/Edit Lead Modal */}
+            <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Top Regions by Deals Won</h3>
+              <div style={{ height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={analyticsData.statesWon} dataKey="won_deals" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} label>
+                      {analyticsData.statesWon.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={['#14b8a6', '#f43f5e', '#6366f1', '#eab308', '#22c55e'][index % 5]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="glass glass-card" style={{ padding: '1.5rem', gridColumn: '1 / -1' }}>
+              <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Control Systems Breakdown</h3>
+              <div style={{ height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={analyticsData.controlData} dataKey="count" nameKey="name" cx="50%" cy="50%" outerRadius={100} label>
+                      {analyticsData.controlData?.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={['#f59e0b', '#ec4899', '#8b5cf6', '#3b82f6', '#10b981'][index % 5]} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="loader"></div>
+        )}
+      </div>
+    ) : (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
+        {territoryData ? (
+          <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Territory Leaderboard</h3>
+            <div className="table-container">
+              <table className="table">
+                <thead>
+                  <tr>
+                    <th>Regional Manager</th>
+                    <th>Total Leads</th>
+                    <th>Active Pipeline</th>
+                    <th>Won Deals</th>
+                    <th>Pipeline Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {territoryData.map(t => (
+                    <tr key={t.name}>
+                      <td style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t.name}</td>
+                      <td>{t.total_leads}</td>
+                      <td>{t.active_leads}</td>
+                      <td style={{ fontWeight: 600, color: '#10b981' }}>{t.won_deals}</td>
+                      <td style={{ color: '#3b82f6' }}>{formatCurrency(t.total_pipeline)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          <div className="loader"></div>
+        )}
+      </div>
+    )}      {/* Add/Edit Lead Modal */}
       {isLeadModalOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
           <div className="glass glass-card" style={{ width: '100%', maxWidth: '600px', maxHeight: '90vh', overflowY: 'auto', padding: '2rem', position: 'relative' }}>

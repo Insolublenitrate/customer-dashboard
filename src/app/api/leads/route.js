@@ -8,6 +8,7 @@ export async function GET(request) {
   const machine = searchParams.get('machine') || ''
   const tabFilter = searchParams.get('tabFilter') || 'all'
   const statusFilter = searchParams.get('statusFilter') || ''
+  const regionalManager = searchParams.get('regionalManager') || ''
   const sortField = searchParams.get('sortField') || 'id'
   const sortDir = searchParams.get('sortDir') || 'DESC'
   const page = parseInt(searchParams.get('page') || '1')
@@ -40,8 +41,8 @@ export async function GET(request) {
 
     if (search) {
       const searchStr = `%${search}%`
-      query += ` AND (company ILIKE $${paramIndex} OR contact_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR city ILIKE $${paramIndex} OR state ILIKE $${paramIndex} OR machine_make ILIKE $${paramIndex} OR machine_model ILIKE $${paramIndex} OR control ILIKE $${paramIndex} OR product ILIKE $${paramIndex})`
-      countQuery += ` AND (company ILIKE $${paramIndex} OR contact_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR city ILIKE $${paramIndex} OR state ILIKE $${paramIndex} OR machine_make ILIKE $${paramIndex} OR machine_model ILIKE $${paramIndex} OR control ILIKE $${paramIndex} OR product ILIKE $${paramIndex})`
+      query += ` AND (company ILIKE $${paramIndex} OR contact_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR city ILIKE $${paramIndex} OR state ILIKE $${paramIndex} OR machine_make ILIKE $${paramIndex} OR machine_model ILIKE $${paramIndex} OR control ILIKE $${paramIndex} OR product ILIKE $${paramIndex} OR regional_manager ILIKE $${paramIndex})`
+      countQuery += ` AND (company ILIKE $${paramIndex} OR contact_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR city ILIKE $${paramIndex} OR state ILIKE $${paramIndex} OR machine_make ILIKE $${paramIndex} OR machine_model ILIKE $${paramIndex} OR control ILIKE $${paramIndex} OR product ILIKE $${paramIndex} OR regional_manager ILIKE $${paramIndex})`
       params.push(searchStr)
       paramIndex++
     }
@@ -57,6 +58,13 @@ export async function GET(request) {
       query += ` AND machine_make ILIKE $${paramIndex}`
       countQuery += ` AND machine_make ILIKE $${paramIndex}`
       params.push(`%${machine}%`)
+      paramIndex++
+    }
+
+    if (regionalManager) {
+      query += ` AND regional_manager = $${paramIndex}`
+      countQuery += ` AND regional_manager = $${paramIndex}`
+      params.push(regionalManager)
       paramIndex++
     }
 
@@ -77,7 +85,7 @@ export async function GET(request) {
     }
 
     // Add ordering and pagination
-    const validSortFields = ['id', 'company', 'state', 'machine_make', 'order_value', 'status', 'last_contacted', 'lead_score', 'contact_name', 'next_action']
+    const validSortFields = ['id', 'company', 'state', 'machine_make', 'order_value', 'status', 'last_contacted', 'lead_score', 'contact_name', 'next_action', 'regional_manager']
     const validSortDirs = ['ASC', 'DESC']
     const safeSortField = validSortFields.includes(sortField) ? sortField : 'id'
     const safeSortDir = validSortDirs.includes(sortDir.toUpperCase()) ? sortDir.toUpperCase() : 'DESC'
