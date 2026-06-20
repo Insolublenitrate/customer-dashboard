@@ -6,6 +6,8 @@ import {
   Search, ChevronLeft, ChevronRight, Settings2, Send, X, Plus, Edit2
 } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis, AreaChart, Area, PieChart, Pie, Legend } from 'recharts'
+import dynamic from 'next/dynamic'
+const USMap = dynamic(() => import('./components/USMap'), { ssr: false })
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
@@ -31,6 +33,7 @@ export default function Dashboard() {
   // Sorting
   const [sortField, setSortField] = useState('id')
   const [sortDir, setSortDir] = useState('DESC')
+  const [selectedManager, setSelectedManager] = useState('')
   
   // Lead Form State
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
@@ -106,7 +109,7 @@ export default function Dashboard() {
   }
 
   const fetchTerritories = () => {
-    fetch('/api/territories')
+    fetch(`/api/territories${selectedManager ? `?manager=${encodeURIComponent(selectedManager)}` : ''}`)
       .then(res => res.json())
       .then(data => setTerritoryData(data))
       .catch(err => console.error("Failed to load territories:", err))
@@ -115,10 +118,10 @@ export default function Dashboard() {
   useEffect(() => {
     fetchLeads()
     fetchAnalytics()
-    if (viewMode === 'territories' && !territoryData) {
+    if (viewMode === 'territories') {
       fetchTerritories()
     }
-  }, [pagination.page, search, stateFilter, activeTab, statusFilter, regionalManagerFilter, sortField, sortDir, viewMode])
+  }, [pagination.page, search, stateFilter, activeTab, statusFilter, regionalManagerFilter, sortField, sortDir, viewMode, selectedManager])
 
   const handleSearch = (e) => {
     setSearch(e.target.value)
@@ -640,51 +643,121 @@ export default function Dashboard() {
       </div>
     ) : (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
+        {/* Manager Selector */}
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <label style={{ color: '#94a3b8' }}>Select Manager View:</label>
+          <select className="input" style={{ width: '300px' }} value={selectedManager} onChange={e => setSelectedManager(e.target.value)}>
+            <option value="">Global / All Managers</option>
+            {['Regional Sales Manager 1', 'Regional Sales Manager 2', 'Regional Sales Manager 3', 'Regional Sales Manager 4', 'Regional Sales Manager 5', 'Regional Sales Manager 6', 'Regional Sales Manager 7', 'Regional Sales Manager 8'].map(m => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </div>
+
         {territoryData ? (
           <>
-          <div className="glass glass-card" style={{ padding: '1.5rem' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Monthly Revenue Growth</h3>
-            <div style={{ height: '300px' }}>
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={territoryData.revenueGrowth} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <XAxis dataKey="month" stroke="#94a3b8" />
-                  <YAxis stroke="#94a3b8" tickFormatter={(val) => `$${val/1000}k`} />
-                  <Tooltip formatter={(val) => formatCurrency(val)} contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
-                  <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Top Level Maps & Progression */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Cumulative YTD Revenue</h3>
+              <div style={{ height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={territoryData.revenueGrowth} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorCumRev" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="month" stroke="#94a3b8" />
+                    <YAxis stroke="#94a3b8" tickFormatter={(val) => `$${val/1000}k`} />
+                    <Tooltip formatter={(val) => formatCurrency(val)} contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                    <Area type="monotone" dataKey="cumulative_revenue" stroke="#10b981" fillOpacity={1} fill="url(#colorCumRev)" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
+
+            {selectedManager ? (
+              <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Manager Funnel</h3>
+                <div style={{ height: '300px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={territoryData.funnel} cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={5} dataKey="value">
+                        {territoryData.funnel.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={['#3b82f6', '#8b5cf6', '#f59e0b', '#ec4899', '#10b981', '#ef4444'][index % 6]} />
+                        ))}
+                      </Pie>
+                      <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            ) : (
+              <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Regional Density</h3>
+                <div style={{ height: '300px', backgroundColor: '#0f172a', borderRadius: '8px', overflow: 'hidden' }}>
+                  <USMap topStates={territoryData.topStates} />
+                </div>
+              </div>
+            )}
           </div>
+
           <div className="glass glass-card" style={{ padding: '1.5rem' }}>
-            <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Territory Leaderboard</h3>
+            <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>{selectedManager ? 'Top States' : 'Territory Leaderboard'}</h3>
             <div className="table-container">
               <table className="table">
-                <thead>
-                  <tr>
-                    <th>Regional Manager</th>
-                    <th>Total Leads</th>
-                    <th>Active Pipeline</th>
-                    <th>Won Deals</th>
-                    <th>Win Rate</th>
-                    <th>Deal Velocity</th>
-                    <th>Avg Deal Size</th>
-                    <th>Pipeline Value</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {territoryData.territories?.map(t => (
-                    <tr key={t.name}>
-                      <td style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t.name}</td>
-                      <td>{t.total_leads}</td>
-                      <td>{t.active_leads}</td>
-                      <td style={{ fontWeight: 600, color: '#10b981' }}>{t.won_deals}</td>
-                      <td>{t.win_rate}%</td>
-                      <td>{t.avg_deal_velocity} days</td>
-                      <td>{formatCurrency(t.avg_deal_size)}</td>
-                      <td style={{ color: '#3b82f6' }}>{formatCurrency(t.total_pipeline)}</td>
-                    </tr>
-                  ))}
-                </tbody>
+                {selectedManager ? (
+                  <>
+                    <thead>
+                      <tr>
+                        <th>State</th>
+                        <th>Won Deals</th>
+                        <th>Total Revenue</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {territoryData.topStates?.map(s => (
+                        <tr key={s.name}>
+                          <td style={{ fontWeight: 600, color: 'var(--foreground)' }}>{s.name}</td>
+                          <td>{s.count}</td>
+                          <td style={{ color: '#3b82f6' }}>{formatCurrency(s.value)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </>
+                ) : (
+                  <>
+                    <thead>
+                      <tr>
+                        <th>Regional Manager</th>
+                        <th>Total Leads</th>
+                        <th>Active Pipeline</th>
+                        <th>Won Deals</th>
+                        <th>Win Rate</th>
+                        <th>Deal Velocity</th>
+                        <th>Avg Deal Size</th>
+                        <th>Pipeline Value</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {territoryData.territories?.map(t => (
+                        <tr key={t.name}>
+                          <td style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t.name}</td>
+                          <td>{t.total_leads}</td>
+                          <td>{t.active_leads}</td>
+                          <td style={{ fontWeight: 600, color: '#10b981' }}>{t.won_deals}</td>
+                          <td>{t.win_rate}%</td>
+                          <td>{t.avg_deal_velocity} days</td>
+                          <td>{formatCurrency(t.avg_deal_size)}</td>
+                          <td style={{ color: '#3b82f6' }}>{formatCurrency(t.total_pipeline)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </>
+                )}
               </table>
             </div>
           </div>

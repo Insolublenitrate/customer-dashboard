@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { db } from '@vercel/postgres'
 
 export async function GET(request) {
+  const { searchParams } = new URL(request.url)
+  const manager = searchParams.get('manager') || ''
+
   try {
     const client = await db.connect()
     
@@ -22,16 +25,57 @@ export async function GET(request) {
       ORDER BY won_deals DESC
     `);
     
-    // Monthly Revenue Growth
+    // Monthly Revenue Growth (Global or Manager Specific)
+    const revenueParams = manager ? [manager] : [];
+    const revenueWhere = manager ? `AND regional_manager = $1` : '';
     const revenueResult = await client.query(`
       SELECT 
         TO_CHAR(DATE_TRUNC('month', won_date), 'Mon YYYY') as month,
         SUM(order_value) as revenue
       FROM leads
-      WHERE status = 'Won' AND won_date IS NOT NULL AND won_date >= NOW() - INTERVAL '12 months'
+      WHERE status = 'Won' AND won_date IS NOT NULL AND won_date >= NOW() - INTERVAL '12 months' ${revenueWhere}
       GROUP BY DATE_TRUNC('month', won_date), TO_CHAR(DATE_TRUNC('month', won_date), 'Mon YYYY')
       ORDER BY DATE_TRUNC('month', won_date) ASC
-    `);
+    `, revenueParams);
+
+    // Cumulative Revenue
+    let cumulative = 0;
+    const revenueGrowth = revenueResult.rows.map(r => {
+      const rev = parseFloat(r.revenue) || 0;
+      cumulative += rev;
+      return { month: r.month, revenue: rev, cumulative_revenue: cumulative };
+    });
+
+    // Funnel & State breakdown (if manager is selected)
+    let funnel = [];
+    let topStates = [];
+    if (manager) {
+      const funnelRes = await client.query(`
+        SELECT status as name, COUNT(*) as value
+        FROM leads
+        WHERE regional_manager = $1
+        GROUP BY status
+      `, [manager]);
+      funnel = funnelRes.rows.map(r => ({ name: r.name, value: parseInt(r.value) || 0 }));
+
+      const stateRes = await client.query(`
+        SELECT state as name, SUM(order_value) as value, COUNT(*) as count
+        FROM leads
+        WHERE regional_manager = $1 AND status = 'Won'
+        GROUP BY state
+        ORDER BY value DESC
+        LIMIT 5
+      `, [manager]);
+      topStates = stateRes.rows.map(r => ({ name: r.name, value: parseFloat(r.value) || 0, count: parseInt(r.count) || 0 }));
+    } else {
+      // Global top states for map
+      const stateRes = await client.query(`
+        SELECT state, COUNT(*) as leads_count, SUM(CASE WHEN status='Won' THEN order_value ELSE 0 END) as won_revenue
+        FROM leads
+        GROUP BY state
+      `);
+      topStates = stateRes.rows.map(r => ({ state: r.state, leads_count: parseInt(r.leads_count) || 0, won_revenue: parseFloat(r.won_revenue) || 0 }));
+    }
 
     client.release()
 
@@ -46,10 +90,9 @@ export async function GET(request) {
         avg_deal_velocity: parseInt(r.avg_deal_velocity) || 0,
         avg_deal_size: parseFloat(r.avg_deal_size) || 0
       })),
-      revenueGrowth: revenueResult.rows.map(r => ({
-        month: r.month,
-        revenue: parseFloat(r.revenue) || 0
-      }))
+      revenueGrowth,
+      funnel,
+      topStates
     })
   } catch (error) {
     console.error('Territory Database Error:', error)
