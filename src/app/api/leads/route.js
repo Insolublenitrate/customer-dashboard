@@ -39,24 +39,24 @@ export async function GET(request) {
     let paramIndex = 1
 
     if (search) {
-      const searchStr = \`%\${search}%\`
-      query += \` AND (company ILIKE $\${paramIndex} OR contact_name ILIKE $\${paramIndex} OR email ILIKE $\${paramIndex} OR city ILIKE $\${paramIndex} OR state ILIKE $\${paramIndex} OR machine_make ILIKE $\${paramIndex} OR machine_model ILIKE $\${paramIndex} OR control ILIKE $\${paramIndex} OR product ILIKE $\${paramIndex})\`
-      countQuery += \` AND (company ILIKE $\${paramIndex} OR contact_name ILIKE $\${paramIndex} OR email ILIKE $\${paramIndex} OR city ILIKE $\${paramIndex} OR state ILIKE $\${paramIndex} OR machine_make ILIKE $\${paramIndex} OR machine_model ILIKE $\${paramIndex} OR control ILIKE $\${paramIndex} OR product ILIKE $\${paramIndex})\`
+      const searchStr = `%${search}%`
+      query += ` AND (company ILIKE $${paramIndex} OR contact_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR city ILIKE $${paramIndex} OR state ILIKE $${paramIndex} OR machine_make ILIKE $${paramIndex} OR machine_model ILIKE $${paramIndex} OR control ILIKE $${paramIndex} OR product ILIKE $${paramIndex})`
+      countQuery += ` AND (company ILIKE $${paramIndex} OR contact_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR city ILIKE $${paramIndex} OR state ILIKE $${paramIndex} OR machine_make ILIKE $${paramIndex} OR machine_model ILIKE $${paramIndex} OR control ILIKE $${paramIndex} OR product ILIKE $${paramIndex})`
       params.push(searchStr)
       paramIndex++
     }
 
     if (state) {
-      query += \` AND state = $\${paramIndex}\`
-      countQuery += \` AND state = $\${paramIndex}\`
+      query += ` AND state = $${paramIndex}`
+      countQuery += ` AND state = $${paramIndex}`
       params.push(state)
       paramIndex++
     }
 
     if (machine) {
-      query += \` AND machine_make ILIKE $\${paramIndex}\`
-      countQuery += \` AND machine_make ILIKE $\${paramIndex}\`
-      params.push(\`%\${machine}%\`)
+      query += ` AND machine_make ILIKE $${paramIndex}`
+      countQuery += ` AND machine_make ILIKE $${paramIndex}`
+      params.push(`%${machine}%`)
       paramIndex++
     }
 
@@ -70,8 +70,8 @@ export async function GET(request) {
     }
 
     if (statusFilter) {
-      query += \` AND status = $\${paramIndex}\`
-      countQuery += \` AND status = $\${paramIndex}\`
+      query += ` AND status = $${paramIndex}`
+      countQuery += ` AND status = $${paramIndex}`
       params.push(statusFilter)
       paramIndex++
     }
@@ -82,7 +82,7 @@ export async function GET(request) {
     const safeSortField = validSortFields.includes(sortField) ? sortField : 'id'
     const safeSortDir = validSortDirs.includes(sortDir.toUpperCase()) ? sortDir.toUpperCase() : 'DESC'
 
-    query += \` ORDER BY \${safeSortField} \${safeSortDir} NULLS LAST LIMIT $\${paramIndex} OFFSET $\${paramIndex + 1}\`
+    query += ` ORDER BY ${safeSortField} ${safeSortDir} NULLS LAST LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
     
     const countResult = await client.query(countQuery, params)
     const total = parseInt(countResult.rows[0].total)
