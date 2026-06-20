@@ -118,7 +118,7 @@ export default function Dashboard() {
   useEffect(() => {
     fetchLeads()
     fetchAnalytics()
-    if (viewMode === 'territories') {
+    if (viewMode === 'territories' || viewMode === 'vp-dashboard') {
       fetchTerritories()
     }
   }, [pagination.page, search, stateFilter, activeTab, statusFilter, regionalManagerFilter, sortField, sortDir, viewMode, selectedManager])
@@ -342,6 +342,16 @@ export default function Dashboard() {
           onClick={() => { setViewMode('territories'); fetchTerritories(); }}
         >
           Territory Performance
+        </button>
+        <button 
+          className={`btn ${viewMode === 'vp-dashboard' ? 'glass' : ''}`}
+          style={{ 
+            backgroundColor: viewMode === 'vp-dashboard' ? 'var(--card-bg)' : 'transparent',
+            color: viewMode === 'vp-dashboard' ? 'white' : '#94a3b8' 
+          }}
+          onClick={() => { setViewMode('vp-dashboard'); fetchTerritories(); }}
+        >
+          VP Executive Dashboard
         </button>
       </div>
 
@@ -759,6 +769,68 @@ export default function Dashboard() {
                   </>
                 )}
               </table>
+            </div>
+          </div>
+          </>
+        ) : (
+          <div className="loader"></div>
+        )}
+      </div>
+    ) : (
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
+        {territoryData ? (
+          <>
+          {/* Top-level KPIs */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+            <div className="glass glass-card">
+              <div className="metric-label">Total Team Pipeline</div>
+              <div className="metric-value">{formatCurrency(territoryData.territories?.reduce((sum, t) => sum + t.total_pipeline, 0))}</div>
+            </div>
+            <div className="glass glass-card">
+              <div className="metric-label">Total Closed Won</div>
+              <div className="metric-value">{formatCurrency(territoryData.revenueGrowth?.reduce((sum, r) => sum + r.revenue, 0))}</div>
+            </div>
+            <div className="glass glass-card">
+              <div className="metric-label">Global Avg Win Rate</div>
+              <div className="metric-value">{(territoryData.territories?.reduce((sum, t) => sum + t.win_rate, 0) / (territoryData.territories?.length || 1)).toFixed(1)}%</div>
+            </div>
+            <div className="glass glass-card">
+              <div className="metric-label">Global Avg Deal Velocity</div>
+              <div className="metric-value">{Math.round(territoryData.territories?.reduce((sum, t) => sum + t.avg_deal_velocity, 0) / (territoryData.territories?.length || 1))} days</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+            {/* Pipeline vs Won Stacked Bar */}
+            <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Pipeline vs. Closed Won (Count)</h3>
+              <div style={{ height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={territoryData.territories} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <XAxis dataKey="name" stroke="#94a3b8" tickFormatter={(v) => v.replace('Regional Sales Manager', 'RSM')} />
+                    <YAxis stroke="#94a3b8" />
+                    <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                    <Legend />
+                    <Bar dataKey="active_leads" stackId="a" fill="#3b82f6" name="Active Pipeline" />
+                    <Bar dataKey="won_deals" stackId="a" fill="#10b981" name="Won Deals" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Avg Deal Size by Manager */}
+            <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+              <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Avg Deal Size by Manager</h3>
+              <div style={{ height: '300px' }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={territoryData.territories} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <XAxis dataKey="name" stroke="#94a3b8" tickFormatter={(v) => v.replace('Regional Sales Manager', 'RSM')} />
+                    <YAxis stroke="#94a3b8" tickFormatter={(val) => `$${val/1000}k`} />
+                    <Tooltip formatter={(val) => formatCurrency(val)} contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                    <Bar dataKey="avg_deal_size" fill="#8b5cf6" name="Avg Deal Size" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
           </>
