@@ -1,27 +1,63 @@
 import { NextResponse } from 'next/server'
 import { db } from '@vercel/postgres'
 
-export async function GET() {
+export async function GET(request) {
+  const { searchParams } = new URL(request.url)
+  const search = searchParams.get('search') || ''
+  const state = searchParams.get('state') || ''
+  const tabFilter = searchParams.get('tabFilter') || 'all'
+  const statusFilter = searchParams.get('statusFilter') || ''
+
   try {
     const client = await db.connect()
     
-    // 1. Average Order Value by Machine Make (only top 5 machines with highest avg order value)
+    let filterSql = '1=1'
+    const params = []
+    let paramIndex = 1
+
+    if (search) {
+      const searchStr = `%${search}%`
+      filterSql += ` AND (company ILIKE $${paramIndex} OR contact_name ILIKE $${paramIndex} OR email ILIKE $${paramIndex} OR city ILIKE $${paramIndex} OR state ILIKE $${paramIndex} OR machine_make ILIKE $${paramIndex} OR machine_model ILIKE $${paramIndex} OR control ILIKE $${paramIndex} OR product ILIKE $${paramIndex})`
+      params.push(searchStr)
+      paramIndex++
+    }
+
+    if (state) {
+      filterSql += ` AND state = $${paramIndex}`
+      params.push(state)
+      paramIndex++
+    }
+
+    if (tabFilter === 'with_email') {
+      filterSql += " AND email IS NOT NULL AND email != '' AND email != 'NOT_FOUND'"
+    } else if (tabFilter === 'high_value') {
+      filterSql += " AND order_value >= 50000"
+    }
+
+    if (statusFilter) {
+      filterSql += ` AND status = $${paramIndex}`
+      params.push(statusFilter)
+      paramIndex++
+    }
+
+    // 1. Average Order Value by Machine Make
     const avgValueByMachine = await client.query(`
       SELECT machine_make as name, AVG(order_value) as avg_value, COUNT(*) as count
       FROM leads 
-      WHERE machine_make IS NOT NULL AND machine_make != 'Unknown' AND order_value > 0
+      WHERE machine_make IS NOT NULL AND machine_make != 'Unknown' AND order_value > 0 AND ${filterSql}
       GROUP BY machine_make 
-      HAVING COUNT(*) > 10
+      HAVING COUNT(*) > 0
       ORDER BY avg_value DESC 
       LIMIT 5
-    `);
+    `, params);
 
     // 2. Sales Funnel (Count by Status)
     const funnelResult = await client.query(`
       SELECT status, COUNT(*) as count 
       FROM leads 
+      WHERE ${filterSql}
       GROUP BY status
-    `);
+    `, params);
     
     // Process Funnel Data into an ordered array
     const statusCounts = {};
@@ -39,11 +75,11 @@ export async function GET() {
     const topStatesWon = await client.query(`
       SELECT state as name, COUNT(*) as won_deals 
       FROM leads 
-      WHERE status = 'Won' AND state IS NOT NULL
+      WHERE status = 'Won' AND state IS NOT NULL AND ${filterSql}
       GROUP BY state 
       ORDER BY won_deals DESC 
       LIMIT 5
-    `);
+    `, params);
 
     client.release()
 

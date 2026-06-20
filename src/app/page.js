@@ -55,8 +55,17 @@ export default function Dashboard() {
       .then(res => res.json())
       .then(data => setStats(data))
       .catch(err => console.error("Failed to load stats:", err))
+  }
 
-    fetch('/api/analytics')
+  const fetchAnalytics = () => {
+    const params = new URLSearchParams({
+      search,
+      state: stateFilter,
+      tabFilter: activeTab,
+      statusFilter
+    })
+    
+    fetch(`/api/analytics?${params}`)
       .then(res => res.json())
       .then(data => setAnalyticsData(data))
       .catch(err => console.error("Failed to load analytics:", err))
@@ -94,6 +103,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchLeads()
+    fetchAnalytics()
   }, [pagination.page, search, stateFilter, activeTab, statusFilter, sortField, sortDir])
 
   const handleSearch = (e) => {
@@ -150,6 +160,7 @@ export default function Dashboard() {
       setIsLeadModalOpen(false)
       fetchLeads()
       fetchStats()
+      fetchAnalytics()
     } catch (err) {
       alert("Error saving lead: " + err.message)
     } finally {
