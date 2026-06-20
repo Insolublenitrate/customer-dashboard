@@ -17,7 +17,15 @@ export async function GET(request) {
   try {
     const client = await db.connect()
     
-    let query = 'SELECT * FROM leads WHERE 1=1'
+    let query = `
+      SELECT *, 
+      (
+        (CASE WHEN order_value >= 50000 THEN 40 ELSE 0 END) +
+        (CASE WHEN email IS NOT NULL AND email != '' AND email != 'NOT_FOUND' THEN 30 ELSE 0 END) +
+        (CASE WHEN machine_make IN ('Makino', 'Okuma', 'Haas', 'Mazak') THEN 30 ELSE 0 END)
+      ) as lead_score
+      FROM leads WHERE 1=1
+    `
     let countQuery = 'SELECT COUNT(*) as total FROM leads WHERE 1=1'
     const params = []
     let paramIndex = 1
@@ -60,7 +68,7 @@ export async function GET(request) {
     }
 
     // Add ordering and pagination
-    const validSortFields = ['id', 'company', 'state', 'machine_make', 'order_value', 'status', 'last_contacted']
+    const validSortFields = ['id', 'company', 'state', 'machine_make', 'order_value', 'status', 'last_contacted', 'lead_score']
     const validSortDirs = ['ASC', 'DESC']
     const safeSortField = validSortFields.includes(sortField) ? sortField : 'id'
     const safeSortDir = validSortDirs.includes(sortDir.toUpperCase()) ? sortDir.toUpperCase() : 'DESC'

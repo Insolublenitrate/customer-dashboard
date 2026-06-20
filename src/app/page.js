@@ -5,9 +5,12 @@ import {
   Building2, Users, DollarSign, Cpu, 
   Search, ChevronLeft, ChevronRight, Settings2, Send, X, Plus, Edit2
 } from 'lucide-react'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null)
+  const [analyticsData, setAnalyticsData] = useState(null)
+  const [viewMode, setViewMode] = useState('database') // 'database' or 'analytics'
   const [leads, setLeads] = useState([])
   const [pagination, setPagination] = useState({ page: 1, totalPages: 1 })
   const [loading, setLoading] = useState(true)
@@ -52,6 +55,11 @@ export default function Dashboard() {
       .then(res => res.json())
       .then(data => setStats(data))
       .catch(err => console.error("Failed to load stats:", err))
+
+    fetch('/api/analytics')
+      .then(res => res.json())
+      .then(data => setAnalyticsData(data))
+      .catch(err => console.error("Failed to load analytics:", err))
   }
 
   useEffect(() => {
@@ -172,6 +180,19 @@ export default function Dashboard() {
     return <span style={{ marginLeft: '4px', fontSize: '0.75rem', color: '#3b82f6' }}>{sortDir === 'ASC' ? '▲' : '▼'}</span>;
   }
 
+  const getNextAction = (lead) => {
+    if (!lead.email || lead.email === 'NOT_FOUND') return { text: 'Find Contact Info', color: '#f59e0b' }
+    if (lead.status === 'New') return { text: 'Send Intro', color: '#3b82f6' }
+    if (lead.status === 'Contacted') {
+      const daysSince = lead.last_contacted ? (new Date() - new Date(lead.last_contacted)) / (1000 * 3600 * 24) : 0;
+      if (daysSince > 7) return { text: 'Needs Follow-up', color: '#ef4444' }
+      return { text: 'Wait for Reply', color: '#94a3b8' }
+    }
+    if (lead.status === 'Qualified') return { text: 'Send Proposal', color: '#10b981' }
+    if (lead.status === 'Won') return { text: 'Closed Won', color: '#10b981' }
+    return { text: 'No Action Needed', color: '#94a3b8' }
+  }
+
   const handleSendCampaign = async () => {
     setIsSending(true);
     setCampaignResult(null);
@@ -262,8 +283,28 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
+      {/* View Toggle */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem' }}>
+        <button 
+          className={`btn ${viewMode === 'database' ? 'glass' : ''}`}
+          style={{ background: viewMode === 'database' ? 'rgba(59, 130, 246, 0.2)' : 'transparent', border: viewMode === 'database' ? '1px solid #3b82f6' : 'none', color: viewMode === 'database' ? '#fff' : '#94a3b8' }}
+          onClick={() => setViewMode('database')}
+        >
+          Lead Database
+        </button>
+        <button 
+          className={`btn ${viewMode === 'analytics' ? 'glass' : ''}`}
+          style={{ background: viewMode === 'analytics' ? 'rgba(16, 185, 129, 0.2)' : 'transparent', border: viewMode === 'analytics' ? '1px solid #10b981' : 'none', color: viewMode === 'analytics' ? '#fff' : '#94a3b8' }}
+          onClick={() => setViewMode('analytics')}
+        >
+          Analytics & Patterns
+        </button>
+      </div>
+
+      {viewMode === 'database' ? (
+        <>
+          {/* Tabs */}
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '1rem' }}>
         <button 
           className={`btn ${activeTab === 'all' ? 'glass' : ''}`}
           style={{ background: activeTab === 'all' ? 'rgba(255,255,255,0.1)' : 'transparent', border: 'none', color: activeTab === 'all' ? '#fff' : '#94a3b8' }}
@@ -337,7 +378,9 @@ export default function Dashboard() {
                   <th>Contact</th>
                   <th onClick={() => handleSort('machine_make')} style={{ cursor: 'pointer' }}>Machine Info {renderSortIndicator('machine_make')}</th>
                   <th onClick={() => handleSort('order_value')} style={{ cursor: 'pointer' }}>Value {renderSortIndicator('order_value')}</th>
+                  <th onClick={() => handleSort('lead_score')} style={{ cursor: 'pointer' }}>Score {renderSortIndicator('lead_score')}</th>
                   <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>Status {renderSortIndicator('status')}</th>
+                  <th>Next Action</th>
                   <th></th>
                 </tr>
               </thead>
@@ -369,6 +412,11 @@ export default function Dashboard() {
                       {formatCurrency(lead.order_value)}
                     </td>
                     <td>
+                      <div className="badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b', border: 'none', fontWeight: 'bold' }}>
+                        {lead.lead_score || 0}
+                      </div>
+                    </td>
+                    <td>
                       <div className="badge" style={{
                         backgroundColor: lead.status === 'Won' ? 'rgba(16, 185, 129, 0.1)' : lead.status === 'Lost' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
                         color: lead.status === 'Won' ? '#10b981' : lead.status === 'Lost' ? '#ef4444' : '#3b82f6',
@@ -381,6 +429,12 @@ export default function Dashboard() {
                           {new Date(lead.last_contacted).toLocaleDateString()}
                         </div>
                       )}
+                    </td>
+                    <td>
+                      {(() => {
+                        const action = getNextAction(lead);
+                        return <div style={{ color: action.color, fontSize: '0.875rem', fontWeight: 500 }}>{action.text}</div>
+                      })()}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <button 
@@ -424,7 +478,58 @@ export default function Dashboard() {
             </button>
           </div>
         )}
-      </div>
+        </>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
+          {analyticsData ? (
+            <>
+              <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Average Value by Machine Type</h3>
+                <div style={{ height: '300px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.valueByMachine} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                      <XAxis type="number" tickFormatter={(val) => `$${val/1000}k`} stroke="#94a3b8" />
+                      <YAxis dataKey="name" type="category" width={80} stroke="#94a3b8" />
+                      <Tooltip formatter={(val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val)} contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                      <Bar dataKey="avg_value" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Sales Funnel Drop-off</h3>
+                <div style={{ height: '300px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.funnelData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                      <XAxis dataKey="name" stroke="#94a3b8" />
+                      <YAxis stroke="#94a3b8" />
+                      <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                      <Bar dataKey="value" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+                <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Top Regions by Deals Won</h3>
+                <div style={{ height: '300px' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={analyticsData.statesWon} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                      <XAxis dataKey="name" stroke="#94a3b8" />
+                      <YAxis stroke="#94a3b8" />
+                      <Tooltip contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                      <Bar dataKey="won_deals" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="loader"></div>
+          )}
+        </div>
+      )}
 
       {/* Add/Edit Lead Modal */}
       {isLeadModalOpen && (
