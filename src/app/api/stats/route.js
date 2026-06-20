@@ -17,13 +17,19 @@ export async function GET() {
     // Top Machines
     const topMachinesResult = await client.query("SELECT machine_make, COUNT(*) as count FROM leads WHERE machine_make IS NOT NULL AND machine_make != 'Unknown' GROUP BY machine_make ORDER BY count DESC LIMIT 5")
 
+    // Sales Metrics
+    const contactedResult = await client.query("SELECT COUNT(*) as count FROM leads WHERE status IN ('Contacted', 'Qualified', 'Proposal', 'Won')")
+    const wonResult = await client.query("SELECT COUNT(*) as count FROM leads WHERE status = 'Won'")
+
     client.release()
 
     return NextResponse.json({
       totalLeads: parseInt(totalLeadsResult.rows[0].count),
       totalOrderValue: parseFloat(totalOrderValueResult.rows[0].sum) || 0,
       topStates: topStatesResult.rows,
-      topMachines: topMachinesResult.rows
+      topMachines: topMachinesResult.rows,
+      contactedLeads: parseInt(contactedResult.rows[0].count),
+      wonLeads: parseInt(wonResult.rows[0].count)
     })
   } catch (error) {
     console.error('Database Error:', error)

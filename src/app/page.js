@@ -166,8 +166,10 @@ export default function Dashboard() {
   }
 
   const renderSortIndicator = (field) => {
-    if (sortField !== field) return null;
-    return <span style={{ marginLeft: '4px', fontSize: '0.75rem' }}>{sortDir === 'ASC' ? '▲' : '▼'}</span>;
+    if (sortField !== field) {
+      return <span style={{ marginLeft: '4px', fontSize: '0.75rem', opacity: 0.3 }}>↕</span>;
+    }
+    return <span style={{ marginLeft: '4px', fontSize: '0.75rem', color: '#3b82f6' }}>{sortDir === 'ASC' ? '▲' : '▼'}</span>;
   }
 
   const handleSendCampaign = async () => {
@@ -245,17 +247,17 @@ export default function Dashboard() {
           </div>
           <div className="glass glass-card">
             <div className="metric-label">
-              <Building2 size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom', color: '#f59e0b' }}/>
-              Top Region
+              <Send size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom', color: '#f59e0b' }}/>
+              Leads Contacted
             </div>
-            <div className="metric-value">{stats.topStates?.[0]?.state || 'N/A'}</div>
+            <div className="metric-value">{stats.contactedLeads?.toLocaleString()}</div>
           </div>
           <div className="glass glass-card">
             <div className="metric-label">
-              <Cpu size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom', color: 'var(--accent)' }}/>
-              Most Common Machine
+              <Building2 size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom', color: 'var(--accent)' }}/>
+              Deals Won
             </div>
-            <div className="metric-value">{stats.topMachines?.[0]?.machine_make || 'N/A'}</div>
+            <div className="metric-value">{stats.wonLeads?.toLocaleString()}</div>
           </div>
         </div>
       )}
@@ -354,8 +356,14 @@ export default function Dashboard() {
                       <div style={{ color: '#94a3b8' }}>{lead.email ? lead.email : lead.contact_phone}</div>
                     </td>
                     <td>
-                      <div className="badge">{lead.machine_make} {lead.machine_model}</div>
-                      <div style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: '#94a3b8' }}>Control: {lead.control}</div>
+                      {lead.machine_make ? (
+                        <div className="badge">{lead.machine_make} {lead.machine_model}</div>
+                      ) : (
+                        <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>N/A</div>
+                      )}
+                      {lead.control && (
+                        <div style={{ fontSize: '0.75rem', marginTop: '0.25rem', color: '#94a3b8' }}>Control: {lead.control}</div>
+                      )}
                     </td>
                     <td style={{ fontWeight: 600, color: '#10b981' }}>
                       {formatCurrency(lead.order_value)}
