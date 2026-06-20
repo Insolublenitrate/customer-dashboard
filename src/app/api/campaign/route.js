@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
+import { db } from '@vercel/postgres';
 import fs from 'fs';
 import path from 'path';
 
@@ -55,6 +56,25 @@ export async function POST(request) {
         console.error(`Failed to send to ${lead.email}:`, err);
         failureCount++;
         results.push({ id: lead.id, email: lead.email, status: 'failed', error: err.message });
+      }
+    }
+
+    if (successCount > 0) {
+      try {
+        const client = await db.connect();
+        const successfulIds = results.filter(r => r.status === 'success').map(r => r.id);
+        
+        if (successfulIds.length > 0) {
+          const idParams = successfulIds.map((_, i) => `$${i + 1}`).join(',');
+          await client.query(`
+            UPDATE leads 
+            SET status = 'Contacted', last_contacted = NOW() 
+            WHERE id IN (${idParams})
+          `, successfulIds);
+        }
+        client.release();
+      } catch (dbErr) {
+        console.error("Failed to update lead statuses after campaign:", dbErr);
       }
     }
 

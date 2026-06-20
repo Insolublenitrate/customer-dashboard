@@ -7,6 +7,9 @@ export async function GET(request) {
   const state = searchParams.get('state') || ''
   const machine = searchParams.get('machine') || ''
   const tabFilter = searchParams.get('tabFilter') || 'all'
+  const statusFilter = searchParams.get('statusFilter') || ''
+  const sortField = searchParams.get('sortField') || 'id'
+  const sortDir = searchParams.get('sortDir') || 'DESC'
   const page = parseInt(searchParams.get('page') || '1')
   const limit = parseInt(searchParams.get('limit') || '50')
   const offset = (page - 1) * limit
@@ -49,8 +52,20 @@ export async function GET(request) {
       countQuery += " AND order_value >= 50000"
     }
 
+    if (statusFilter) {
+      query += ` AND status = $${paramIndex}`
+      countQuery += ` AND status = $${paramIndex}`
+      params.push(statusFilter)
+      paramIndex++
+    }
+
     // Add ordering and pagination
-    query += ` ORDER BY id DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
+    const validSortFields = ['id', 'company', 'state', 'machine_make', 'order_value', 'status', 'last_contacted']
+    const validSortDirs = ['ASC', 'DESC']
+    const safeSortField = validSortFields.includes(sortField) ? sortField : 'id'
+    const safeSortDir = validSortDirs.includes(sortDir.toUpperCase()) ? sortDir.toUpperCase() : 'DESC'
+
+    query += ` ORDER BY ${safeSortField} ${safeSortDir} NULLS LAST LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
     
     const countResult = await client.query(countQuery, params)
     const total = parseInt(countResult.rows[0].total)
@@ -84,14 +99,16 @@ export async function POST(request) {
     const query = `
       INSERT INTO leads (
         company, contact_name, email, contact_phone, 
-        city, state, zip, machine_make, machine_model, control, product, order_value
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        city, state, zip, machine_make, machine_model, control, product, order_value, status, last_contacted
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
       RETURNING id
     `
     const params = [
       body.company, body.contact_name, body.email, body.contact_phone,
       body.city, body.state, body.zip, body.machine_make, body.machine_model, 
-      body.control, body.product, body.order_value || 0
+      body.control, body.product, body.order_value || 0,
+      body.status || 'New',
+      body.last_contacted ? new Date(body.last_contacted).toISOString() : null
     ]
 
     const result = await client.query(query, params)
@@ -117,13 +134,15 @@ export async function PUT(request) {
       UPDATE leads SET 
         company = $1, contact_name = $2, email = $3, contact_phone = $4, 
         city = $5, state = $6, zip = $7, machine_make = $8, machine_model = $9, 
-        control = $10, product = $11, order_value = $12
-      WHERE id = $13
+        control = $10, product = $11, order_value = $12, status = $13, last_contacted = $14
+      WHERE id = $15
     `
     const params = [
       body.company, body.contact_name, body.email, body.contact_phone,
       body.city, body.state, body.zip, body.machine_make, body.machine_model, 
       body.control, body.product, body.order_value || 0,
+      body.status || 'New',
+      body.last_contacted ? new Date(body.last_contacted).toISOString() : null,
       body.id
     ]
 

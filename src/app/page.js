@@ -20,7 +20,12 @@ export default function Dashboard() {
   // Filters
   const [search, setSearch] = useState('')
   const [stateFilter, setStateFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
   const [activeTab, setActiveTab] = useState('all') // 'all', 'with_email', 'high_value'
+  
+  // Sorting
+  const [sortField, setSortField] = useState('id')
+  const [sortDir, setSortDir] = useState('DESC')
   
   // Lead Form State
   const [isLeadModalOpen, setIsLeadModalOpen] = useState(false)
@@ -28,7 +33,7 @@ export default function Dashboard() {
   const [formData, setFormData] = useState({
     company: '', contact_name: '', email: '', contact_phone: '',
     city: '', state: '', zip: '', machine_make: '', machine_model: '',
-    control: '', product: '', order_value: ''
+    control: '', product: '', order_value: '', status: 'New', last_contacted: ''
   })
   const [isSaving, setIsSaving] = useState(false)
 
@@ -60,7 +65,10 @@ export default function Dashboard() {
       page: pagination.page,
       search,
       state: stateFilter,
-      tabFilter: activeTab
+      tabFilter: activeTab,
+      statusFilter,
+      sortField,
+      sortDir
     })
     
     fetch(`/api/leads?${params}`)
@@ -78,7 +86,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchLeads()
-  }, [pagination.page, search, stateFilter, activeTab])
+  }, [pagination.page, search, stateFilter, activeTab, statusFilter, sortField, sortDir])
 
   const handleSearch = (e) => {
     setSearch(e.target.value)
@@ -95,7 +103,7 @@ export default function Dashboard() {
     setFormData({
       company: '', contact_name: '', email: '', contact_phone: '',
       city: '', state: '', zip: '', machine_make: '', machine_model: '',
-      control: '', product: '', order_value: ''
+      control: '', product: '', order_value: '', status: 'New', last_contacted: ''
     })
     setIsLeadModalOpen(true)
   }
@@ -108,7 +116,8 @@ export default function Dashboard() {
       city: lead.city || '', state: lead.state || '', zip: lead.zip || '', 
       machine_make: lead.machine_make || '', machine_model: lead.machine_model || '',
       control: lead.control || '', product: lead.product || '', 
-      order_value: lead.order_value || ''
+      order_value: lead.order_value || '', status: lead.status || 'New',
+      last_contacted: lead.last_contacted ? new Date(lead.last_contacted).toISOString().split('T')[0] : ''
     })
     setIsLeadModalOpen(true)
   }
@@ -138,6 +147,27 @@ export default function Dashboard() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  const handleExport = () => {
+    const params = new URLSearchParams({
+      search, state: stateFilter, tabFilter: activeTab, statusFilter, sortField, sortDir
+    });
+    window.location.href = `/api/export?${params.toString()}`;
+  }
+
+  const handleSort = (field) => {
+    if (sortField === field) {
+      setSortDir(sortDir === 'ASC' ? 'DESC' : 'ASC')
+    } else {
+      setSortField(field)
+      setSortDir('ASC')
+    }
+  }
+
+  const renderSortIndicator = (field) => {
+    if (sortField !== field) return null;
+    return <span style={{ marginLeft: '4px', fontSize: '0.75rem' }}>{sortDir === 'ASC' ? '▲' : '▼'}</span>;
   }
 
   const handleSendCampaign = async () => {
@@ -178,7 +208,7 @@ export default function Dashboard() {
           <p style={{ color: '#94a3b8' }}>CNC Manufacturing Prospects Database</p>
         </div>
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn glass">
+          <button className="btn glass" onClick={handleExport}>
             <Settings2 size={16} style={{ display: 'inline', marginRight: '8px', verticalAlign: 'text-bottom' }}/> 
             Export
           </button>
@@ -278,6 +308,19 @@ export default function Dashboard() {
               <option key={s.state} value={s.state}>{s.state} ({s.count})</option>
             ))}
           </select>
+          <select 
+            className="input" 
+            value={statusFilter} 
+            onChange={(e) => { setStatusFilter(e.target.value); setPagination(p => ({ ...p, page: 1 })) }}
+          >
+            <option value="">All Statuses</option>
+            <option value="New">New</option>
+            <option value="Contacted">Contacted</option>
+            <option value="Qualified">Qualified</option>
+            <option value="Proposal">Proposal</option>
+            <option value="Won">Won</option>
+            <option value="Lost">Lost</option>
+          </select>
         </div>
 
         {loading ? (
@@ -287,11 +330,12 @@ export default function Dashboard() {
             <table className="table">
               <thead>
                 <tr>
-                  <th>Company</th>
-                  <th>Location</th>
+                  <th onClick={() => handleSort('company')} style={{ cursor: 'pointer' }}>Company {renderSortIndicator('company')}</th>
+                  <th onClick={() => handleSort('state')} style={{ cursor: 'pointer' }}>Location {renderSortIndicator('state')}</th>
                   <th>Contact</th>
-                  <th>Machine Info</th>
-                  <th>Value</th>
+                  <th onClick={() => handleSort('machine_make')} style={{ cursor: 'pointer' }}>Machine Info {renderSortIndicator('machine_make')}</th>
+                  <th onClick={() => handleSort('order_value')} style={{ cursor: 'pointer' }}>Value {renderSortIndicator('order_value')}</th>
+                  <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>Status {renderSortIndicator('status')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -315,6 +359,20 @@ export default function Dashboard() {
                     </td>
                     <td style={{ fontWeight: 600, color: '#10b981' }}>
                       {formatCurrency(lead.order_value)}
+                    </td>
+                    <td>
+                      <div className="badge" style={{
+                        backgroundColor: lead.status === 'Won' ? 'rgba(16, 185, 129, 0.1)' : lead.status === 'Lost' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(59, 130, 246, 0.1)',
+                        color: lead.status === 'Won' ? '#10b981' : lead.status === 'Lost' ? '#ef4444' : '#3b82f6',
+                        border: 'none'
+                      }}>
+                        {lead.status || 'New'}
+                      </div>
+                      {lead.last_contacted && (
+                        <div style={{ fontSize: '0.7rem', color: '#94a3b8', marginTop: '4px' }}>
+                          {new Date(lead.last_contacted).toLocaleDateString()}
+                        </div>
+                      )}
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <button 
@@ -423,6 +481,24 @@ export default function Dashboard() {
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#94a3b8' }}>Machine Model</label>
                   <input className="input" style={{ width: '100%' }} value={formData.machine_model} onChange={e => setFormData({...formData, machine_model: e.target.value})} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#94a3b8' }}>Status</label>
+                  <select className="input" style={{ width: '100%' }} value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})}>
+                    <option value="New">New</option>
+                    <option value="Contacted">Contacted</option>
+                    <option value="Qualified">Qualified</option>
+                    <option value="Proposal">Proposal</option>
+                    <option value="Won">Won</option>
+                    <option value="Lost">Lost</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.875rem', color: '#94a3b8' }}>Last Contacted Date</label>
+                  <input type="date" className="input" style={{ width: '100%' }} value={formData.last_contacted} onChange={e => setFormData({...formData, last_contacted: e.target.value})} />
                 </div>
               </div>
 
