@@ -23,7 +23,15 @@ export async function GET(request) {
         (CASE WHEN order_value >= 50000 THEN 40 ELSE 0 END) +
         (CASE WHEN email IS NOT NULL AND email != '' AND email != 'NOT_FOUND' THEN 30 ELSE 0 END) +
         (CASE WHEN machine_make IN ('Makino', 'Okuma', 'Haas', 'Mazak') THEN 30 ELSE 0 END)
-      ) as lead_score
+      ) as lead_score,
+      (CASE 
+        WHEN email IS NULL OR email = '' OR email = 'NOT_FOUND' THEN 'Find Contact Info'
+        WHEN status = 'New' THEN 'Send Intro'
+        WHEN status = 'Contacted' THEN (CASE WHEN EXTRACT(DAY FROM (NOW() - last_contacted)) > 7 THEN 'Needs Follow-up' ELSE 'Wait for Reply' END)
+        WHEN status = 'Qualified' THEN 'Send Proposal'
+        WHEN status = 'Won' THEN 'Closed Won'
+        ELSE 'No Action Needed'
+      END) as next_action
       FROM leads WHERE 1=1
     `
     let countQuery = 'SELECT COUNT(*) as total FROM leads WHERE 1=1'
@@ -31,23 +39,24 @@ export async function GET(request) {
     let paramIndex = 1
 
     if (search) {
-      query += ` AND company ILIKE $${paramIndex}`
-      countQuery += ` AND company ILIKE $${paramIndex}`
-      params.push(`%${search}%`)
+      const searchStr = \`%\${search}%\`
+      query += \` AND (company ILIKE $\${paramIndex} OR contact_name ILIKE $\${paramIndex} OR email ILIKE $\${paramIndex} OR city ILIKE $\${paramIndex} OR state ILIKE $\${paramIndex} OR machine_make ILIKE $\${paramIndex} OR machine_model ILIKE $\${paramIndex} OR control ILIKE $\${paramIndex} OR product ILIKE $\${paramIndex})\`
+      countQuery += \` AND (company ILIKE $\${paramIndex} OR contact_name ILIKE $\${paramIndex} OR email ILIKE $\${paramIndex} OR city ILIKE $\${paramIndex} OR state ILIKE $\${paramIndex} OR machine_make ILIKE $\${paramIndex} OR machine_model ILIKE $\${paramIndex} OR control ILIKE $\${paramIndex} OR product ILIKE $\${paramIndex})\`
+      params.push(searchStr)
       paramIndex++
     }
 
     if (state) {
-      query += ` AND state = $${paramIndex}`
-      countQuery += ` AND state = $${paramIndex}`
+      query += \` AND state = $\${paramIndex}\`
+      countQuery += \` AND state = $\${paramIndex}\`
       params.push(state)
       paramIndex++
     }
 
     if (machine) {
-      query += ` AND machine_make ILIKE $${paramIndex}`
-      countQuery += ` AND machine_make ILIKE $${paramIndex}`
-      params.push(`%${machine}%`)
+      query += \` AND machine_make ILIKE $\${paramIndex}\`
+      countQuery += \` AND machine_make ILIKE $\${paramIndex}\`
+      params.push(\`%\${machine}%\`)
       paramIndex++
     }
 
@@ -61,19 +70,19 @@ export async function GET(request) {
     }
 
     if (statusFilter) {
-      query += ` AND status = $${paramIndex}`
-      countQuery += ` AND status = $${paramIndex}`
+      query += \` AND status = $\${paramIndex}\`
+      countQuery += \` AND status = $\${paramIndex}\`
       params.push(statusFilter)
       paramIndex++
     }
 
     // Add ordering and pagination
-    const validSortFields = ['id', 'company', 'state', 'machine_make', 'order_value', 'status', 'last_contacted', 'lead_score']
+    const validSortFields = ['id', 'company', 'state', 'machine_make', 'order_value', 'status', 'last_contacted', 'lead_score', 'contact_name', 'next_action']
     const validSortDirs = ['ASC', 'DESC']
     const safeSortField = validSortFields.includes(sortField) ? sortField : 'id'
     const safeSortDir = validSortDirs.includes(sortDir.toUpperCase()) ? sortDir.toUpperCase() : 'DESC'
 
-    query += ` ORDER BY ${safeSortField} ${safeSortDir} NULLS LAST LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`
+    query += \` ORDER BY \${safeSortField} \${safeSortDir} NULLS LAST LIMIT $\${paramIndex} OFFSET $\${paramIndex + 1}\`
     
     const countResult = await client.query(countQuery, params)
     const total = parseInt(countResult.rows[0].total)

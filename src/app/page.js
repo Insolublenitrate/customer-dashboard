@@ -334,7 +334,7 @@ export default function Dashboard() {
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94a3b8' }}/>
             <input 
               type="text" 
-              placeholder="Search companies..." 
+              placeholder="Search all fields..." 
               className="input" 
               style={{ paddingLeft: '2.5rem' }}
               value={search}
@@ -375,12 +375,12 @@ export default function Dashboard() {
                 <tr>
                   <th onClick={() => handleSort('company')} style={{ cursor: 'pointer' }}>Company {renderSortIndicator('company')}</th>
                   <th onClick={() => handleSort('state')} style={{ cursor: 'pointer' }}>Location {renderSortIndicator('state')}</th>
-                  <th>Contact</th>
+                  <th onClick={() => handleSort('contact_name')} style={{ cursor: 'pointer' }}>Contact {renderSortIndicator('contact_name')}</th>
                   <th onClick={() => handleSort('machine_make')} style={{ cursor: 'pointer' }}>Machine Info {renderSortIndicator('machine_make')}</th>
                   <th onClick={() => handleSort('order_value')} style={{ cursor: 'pointer' }}>Value {renderSortIndicator('order_value')}</th>
                   <th onClick={() => handleSort('lead_score')} style={{ cursor: 'pointer' }}>Score {renderSortIndicator('lead_score')}</th>
                   <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>Status {renderSortIndicator('status')}</th>
-                  <th>Next Action</th>
+                  <th onClick={() => handleSort('next_action')} style={{ cursor: 'pointer' }}>Next Action {renderSortIndicator('next_action')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -432,8 +432,13 @@ export default function Dashboard() {
                     </td>
                     <td>
                       {(() => {
-                        const action = getNextAction(lead);
-                        return <div style={{ color: action.color, fontSize: '0.875rem', fontWeight: 500 }}>{action.text}</div>
+                        const text = lead.next_action || 'No Action Needed';
+                        let color = '#94a3b8';
+                        if (text === 'Find Contact Info') color = '#f59e0b';
+                        if (text === 'Send Intro') color = '#3b82f6';
+                        if (text === 'Needs Follow-up') color = '#ef4444';
+                        if (text === 'Send Proposal' || text === 'Closed Won') color = '#10b981';
+                        return <div style={{ color, fontSize: '0.875rem', fontWeight: 500 }}>{text}</div>
                       })()}
                     </td>
                     <td style={{ textAlign: 'right' }}>
