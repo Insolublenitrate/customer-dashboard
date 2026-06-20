@@ -108,7 +108,7 @@ export default function Dashboard() {
   const fetchTerritories = () => {
     fetch('/api/territories')
       .then(res => res.json())
-      .then(data => setTerritoryData(data.territories))
+      .then(data => setTerritoryData(data))
       .catch(err => console.error("Failed to load territories:", err))
   }
 
@@ -641,6 +641,20 @@ export default function Dashboard() {
     ) : (
       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '2rem' }}>
         {territoryData ? (
+          <>
+          <div className="glass glass-card" style={{ padding: '1.5rem' }}>
+            <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Monthly Revenue Growth</h3>
+            <div style={{ height: '300px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={territoryData.revenueGrowth} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <XAxis dataKey="month" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" tickFormatter={(val) => `$${val/1000}k`} />
+                  <Tooltip formatter={(val) => formatCurrency(val)} contentStyle={{ backgroundColor: '#1e293b', border: 'none', borderRadius: '8px', color: '#f8fafc' }} />
+                  <Bar dataKey="revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
           <div className="glass glass-card" style={{ padding: '1.5rem' }}>
             <h3 style={{ marginTop: 0, marginBottom: '1.5rem', color: 'var(--foreground)' }}>Territory Leaderboard</h3>
             <div className="table-container">
@@ -651,16 +665,22 @@ export default function Dashboard() {
                     <th>Total Leads</th>
                     <th>Active Pipeline</th>
                     <th>Won Deals</th>
+                    <th>Win Rate</th>
+                    <th>Deal Velocity</th>
+                    <th>Avg Deal Size</th>
                     <th>Pipeline Value</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {territoryData.map(t => (
+                  {territoryData.territories?.map(t => (
                     <tr key={t.name}>
                       <td style={{ fontWeight: 600, color: 'var(--foreground)' }}>{t.name}</td>
                       <td>{t.total_leads}</td>
                       <td>{t.active_leads}</td>
                       <td style={{ fontWeight: 600, color: '#10b981' }}>{t.won_deals}</td>
+                      <td>{t.win_rate}%</td>
+                      <td>{t.avg_deal_velocity} days</td>
+                      <td>{formatCurrency(t.avg_deal_size)}</td>
                       <td style={{ color: '#3b82f6' }}>{formatCurrency(t.total_pipeline)}</td>
                     </tr>
                   ))}
@@ -668,6 +688,7 @@ export default function Dashboard() {
               </table>
             </div>
           </div>
+          </>
         ) : (
           <div className="loader"></div>
         )}
