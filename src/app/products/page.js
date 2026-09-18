@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Package, Plus, X } from 'lucide-react'
+import MetricStrip from '../components/MetricStrip'
 
 const emptyForm = { name: '', sku: '', unit: 'gallon', unit_price: '', supplier_name: '', reorder_lead_time_days: 14 }
 
@@ -57,6 +58,8 @@ export default function ProductsPage() {
           Add product
         </button>
       </div>
+
+      <MetricStrip screen="products" />
 
       {loading ? (
         <div className="loader" />

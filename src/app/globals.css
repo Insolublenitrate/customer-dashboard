@@ -445,6 +445,48 @@ a.glass-card:hover,
   color: var(--muted);
 }
 
+/* Per-screen metric strip */
+.metric-strip {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.metric-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.metric-strip-item {
+  flex: 1 1 0;
+  min-width: 108px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.metric-strip-label {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metric-strip-value {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
 /* Radial corner nav (mobile) — anchored in the bottom-right so every
    destination sits inside one thumb's sweep without a reach across the screen. */
 .radial-nav {
@@ -483,6 +525,18 @@ a.glass-card:hover,
 
   .glass-card {
     padding: 1rem;
+  }
+
+  /* Strip scrolls sideways on a phone instead of squeezing every tile. */
+  .metric-strip {
+    margin-left: -1rem;
+    margin-right: -1rem;
+    padding: 0 1rem;
+  }
+
+  .metric-strip-item {
+    flex: 0 0 auto;
+    min-width: 118px;
   }
 
   .top-bar-links {

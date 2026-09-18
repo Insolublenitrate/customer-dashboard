@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Boxes, Plus, X } from 'lucide-react'
 import { detergentPerFill } from '@/lib/consumption'
+import MetricStrip from '../components/MetricStrip'
 
 const emptyForm = { name: '', tank_capacity: '', fill_frequency_per_week: '', notes: '' }
 
@@ -58,6 +59,8 @@ export default function MachineModelsPage() {
           Add model
         </button>
       </div>
+
+      <MetricStrip screen="machine-models" />
 
       {loading ? (
         <div className="loader" />

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Plus, X, Trash2, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
 import { PO_STATUSES } from '@/lib/constants'
+import MetricStrip from '../components/MetricStrip'
 
 const emptyItem = { product_id: '', description: '', quantity: 1, unit_price: '' }
 const emptyForm = {
@@ -105,6 +106,8 @@ export default function OrdersPage() {
           New order
         </button>
       </div>
+
+      <MetricStrip screen="orders" />
 
       <div className="input-group">
         {[

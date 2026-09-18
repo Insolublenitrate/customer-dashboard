@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Ship, Plus, X, AlertTriangle } from 'lucide-react'
 import { SOURCING_STAGES } from '@/lib/constants'
 import { formatStatus } from '@/lib/format'
+import MetricStrip from '../components/MetricStrip'
 
 const emptyForm = {
   project_id: '', facility_id: '', machine_model_id: '', supplier_name: '', supplier_country: '',
@@ -97,6 +98,8 @@ export default function SourcingPage() {
           New sourcing order
         </button>
       </div>
+
+      <MetricStrip screen="sourcing" />
 
       <div className="input-group">
         <button className={`btn ${stageFilter === '' ? '' : 'btn-secondary'}`} onClick={() => setStageFilter('')}>All</button>

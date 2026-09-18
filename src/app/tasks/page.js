@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Calendar, User } from 'lucide-react'
+import MetricStrip from '../components/MetricStrip'
 
 export default function TasksPage() {
   const [items, setItems] = useState([])
@@ -42,6 +43,8 @@ export default function TasksPage() {
           <p>Every action item across all facilities.</p>
         </div>
       </div>
+
+      <MetricStrip screen="tasks" />
 
       <div className="input-group">
         {[

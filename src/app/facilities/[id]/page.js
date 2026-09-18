@@ -4,6 +4,7 @@ import { useEffect, useState, use as usePromise } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Star, Wrench, AlertTriangle } from 'lucide-react'
 import { PROJECT_STATUSES, MACHINE_STATUSES } from '@/lib/constants'
+import MetricStrip from '../../components/MetricStrip'
 
 const emptyContact = { name: '', title: '', email: '', phone: '', is_primary: false }
 const emptyProject = { title: '', spec_summary: '', status: 'discovery', quote_value: '', target_date: '' }
@@ -171,6 +172,8 @@ export default function FacilityDetailPage({ params }) {
           </p>
         </div>
       </div>
+
+      <MetricStrip screen="facility" facilityId={id} />
 
       {facility.regulatory_notes && (
         <div className="glass glass-card" style={{ marginBottom: '2rem' }}>

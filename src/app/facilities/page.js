@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Building2, Plus, X } from 'lucide-react'
+import MetricStrip from '../components/MetricStrip'
 
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA',
@@ -67,6 +68,8 @@ export default function FacilitiesPage() {
           Add facility
         </button>
       </div>
+
+      <MetricStrip screen="facilities" />
 
       {loading ? (
         <div className="loader" />

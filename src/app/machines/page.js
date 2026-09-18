@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Wrench, Plus, X } from 'lucide-react'
 import { MACHINE_STATUSES } from '@/lib/constants'
 import { detergentPerFill } from '@/lib/consumption'
+import MetricStrip from '../components/MetricStrip'
 
 const emptyForm = {
   facility_id: '', machine_model_id: '', sourcing_order_id: '', serial_number: '', model: '', install_date: '', status: 'active',
@@ -107,6 +108,8 @@ export default function MachinesPage() {
           Add machine
         </button>
       </div>
+
+      <MetricStrip screen="machines" />
 
       <div className="input-group">
         <select className="input" value={facilityFilter} onChange={(e) => setFacilityFilter(e.target.value)}>

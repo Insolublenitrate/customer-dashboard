@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Upload, FileText, Mail, Phone, File as FileIcon, Download } from 'lucide-react'
 import { COMMUNICATION_TYPES } from '@/lib/constants'
+import MetricStrip from '../components/MetricStrip'
 
 const TYPE_ICON = {
   meeting_minutes: FileText,
@@ -108,6 +109,8 @@ export default function CommunicationsPage() {
           <p style={{ color: 'var(--muted)' }}>Upload meeting minutes and emails — Claude summarizes them and pulls out action items.</p>
         </div>
       </div>
+
+      <MetricStrip screen="communications" />
 
       <div className="glass glass-card" style={{ marginBottom: '2rem' }}>
         <div className="input-group" style={{ marginBottom: '1rem' }}>
