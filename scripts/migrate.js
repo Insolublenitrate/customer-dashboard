@@ -101,6 +101,97 @@ async function migrate() {
     );
   `)
 
+  console.log('Creating products...')
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS products (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      sku TEXT,
+      unit TEXT NOT NULL DEFAULT 'gallon',
+      unit_price NUMERIC,
+      supplier_name TEXT,
+      reorder_lead_time_days INTEGER NOT NULL DEFAULT 14,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  console.log('Creating machines...')
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS machines (
+      id SERIAL PRIMARY KEY,
+      facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
+      project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+      serial_number TEXT,
+      model TEXT,
+      install_date DATE,
+      status TEXT NOT NULL DEFAULT 'active',
+      default_product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+      tank_capacity NUMERIC,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  console.log('Creating consumable_stock...')
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS consumable_stock (
+      id SERIAL PRIMARY KEY,
+      facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      quantity_on_hand NUMERIC NOT NULL DEFAULT 0,
+      reorder_threshold NUMERIC NOT NULL DEFAULT 0,
+      unit TEXT NOT NULL DEFAULT 'gallon',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      UNIQUE (facility_id, product_id)
+    );
+  `)
+
+  console.log('Creating consumption_logs...')
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS consumption_logs (
+      id SERIAL PRIMARY KEY,
+      facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      machine_id INTEGER REFERENCES machines(id) ON DELETE SET NULL,
+      type TEXT NOT NULL DEFAULT 'usage',
+      quantity NUMERIC NOT NULL,
+      logged_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      notes TEXT,
+      created_by TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  console.log('Creating purchase_orders...')
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS purchase_orders (
+      id SERIAL PRIMARY KEY,
+      direction TEXT NOT NULL DEFAULT 'incoming',
+      facility_id INTEGER REFERENCES facilities(id) ON DELETE SET NULL,
+      supplier_name TEXT,
+      status TEXT NOT NULL DEFAULT 'draft',
+      po_number TEXT,
+      expected_date DATE,
+      total_value NUMERIC,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  console.log('Creating purchase_order_items...')
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS purchase_order_items (
+      id SERIAL PRIMARY KEY,
+      purchase_order_id INTEGER NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
+      product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+      description TEXT,
+      quantity NUMERIC NOT NULL DEFAULT 1,
+      unit_price NUMERIC,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
   console.log('Domain schema migration complete.')
   client.release()
   process.exit(0)

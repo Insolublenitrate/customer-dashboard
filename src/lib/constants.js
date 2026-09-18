@@ -13,3 +13,11 @@ export const PROJECT_STATUSES = [
 export const ACTION_ITEM_STATUSES = ['open', 'done']
 
 export const COMMUNICATION_TYPES = ['meeting_minutes', 'email', 'call_note', 'other']
+
+export const MACHINE_STATUSES = ['active', 'needs_service', 'offline', 'decommissioned']
+
+export const CONSUMPTION_LOG_TYPES = ['usage', 'delivery', 'adjustment']
+
+export const PO_DIRECTIONS = ['incoming', 'outgoing']
+
+export const PO_STATUSES = ['draft', 'submitted', 'confirmed', 'shipped', 'fulfilled', 'cancelled']

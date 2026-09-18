@@ -2,11 +2,13 @@
 
 import { useEffect, useState, use as usePromise } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Plus, Star } from 'lucide-react'
-import { PROJECT_STATUSES } from '@/lib/constants'
+import { ArrowLeft, Plus, Star, Wrench, AlertTriangle } from 'lucide-react'
+import { PROJECT_STATUSES, MACHINE_STATUSES } from '@/lib/constants'
 
 const emptyContact = { name: '', title: '', email: '', phone: '', is_primary: false }
 const emptyProject = { title: '', spec_summary: '', status: 'discovery', quote_value: '', target_date: '' }
+const emptyMachine = { serial_number: '', model: '', install_date: '', status: 'active', default_product_id: '' }
+const emptyLog = { product_id: '', type: 'usage', quantity: '', notes: '' }
 
 function formatStatus(status) {
   return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -15,16 +17,32 @@ function formatStatus(status) {
 export default function FacilityDetailPage({ params }) {
   const { id } = usePromise(params)
   const [data, setData] = useState(null)
+  const [stockData, setStockData] = useState(null)
+  const [machines, setMachines] = useState([])
+  const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [showContactForm, setShowContactForm] = useState(false)
   const [showProjectForm, setShowProjectForm] = useState(false)
+  const [showMachineForm, setShowMachineForm] = useState(false)
+  const [showLogForm, setShowLogForm] = useState(false)
   const [contactForm, setContactForm] = useState(emptyContact)
   const [projectForm, setProjectForm] = useState(emptyProject)
+  const [machineForm, setMachineForm] = useState(emptyMachine)
+  const [logForm, setLogForm] = useState(emptyLog)
 
   const fetchData = () => {
-    fetch(`/api/facilities/${id}`)
-      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load facility'))))
-      .then(setData)
+    Promise.all([
+      fetch(`/api/facilities/${id}`).then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load facility')))),
+      fetch(`/api/facilities/${id}/stock`).then((res) => (res.ok ? res.json() : { stock: [], consumption_logs: [] })),
+      fetch(`/api/machines?facility_id=${id}`).then((res) => (res.ok ? res.json() : { machines: [] })),
+      fetch('/api/products').then((res) => (res.ok ? res.json() : { products: [] })),
+    ])
+      .then(([facilityData, stock, machinesData, productsData]) => {
+        setData(facilityData)
+        setStockData(stock)
+        setMachines(machinesData.machines || [])
+        setProducts(productsData.products || [])
+      })
       .catch((err) => console.error('Failed to load facility:', err))
       .finally(() => setLoading(false))
   }
@@ -33,6 +51,31 @@ export default function FacilityDetailPage({ params }) {
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  const addMachine = async (e) => {
+    e.preventDefault()
+    await fetch('/api/machines', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...machineForm, facility_id: id }),
+    })
+    setShowMachineForm(false)
+    setMachineForm(emptyMachine)
+    fetchData()
+  }
+
+  const logConsumption = async (e) => {
+    e.preventDefault()
+    if (!logForm.product_id || !logForm.quantity) return
+    await fetch(`/api/facilities/${id}/stock`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(logForm),
+    })
+    setShowLogForm(false)
+    setLogForm(emptyLog)
+    fetchData()
+  }
 
   const addContact = async (e) => {
     e.preventDefault()
@@ -219,6 +262,118 @@ export default function FacilityDetailPage({ params }) {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid-responsive-2" style={{ marginTop: '2rem' }}>
+        {/* Machines at this site */}
+        <div className="glass glass-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0 }}>Machines at this site</h3>
+            <button className="btn btn-secondary" onClick={() => setShowMachineForm((v) => !v)}>
+              <Plus size={14} />
+            </button>
+          </div>
+
+          {showMachineForm && (
+            <form onSubmit={addMachine} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+              <input className="input" placeholder="Model / designation" value={machineForm.model}
+                onChange={(e) => setMachineForm({ ...machineForm, model: e.target.value })} />
+              <input className="input" placeholder="Serial number" value={machineForm.serial_number}
+                onChange={(e) => setMachineForm({ ...machineForm, serial_number: e.target.value })} />
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input className="input" type="date" value={machineForm.install_date}
+                  onChange={(e) => setMachineForm({ ...machineForm, install_date: e.target.value })} style={{ flex: '1 1 140px' }} />
+                <select className="input" value={machineForm.status}
+                  onChange={(e) => setMachineForm({ ...machineForm, status: e.target.value })} style={{ flex: '1 1 120px' }}>
+                  {MACHINE_STATUSES.map((s) => <option key={s} value={s}>{formatStatus(s)}</option>)}
+                </select>
+              </div>
+              <select className="input" value={machineForm.default_product_id}
+                onChange={(e) => setMachineForm({ ...machineForm, default_product_id: e.target.value })}>
+                <option value="">Detergent used (optional)…</option>
+                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <button type="submit" className="btn">Add machine</button>
+            </form>
+          )}
+
+          {machines.length === 0 ? (
+            <p className="text-muted">No machines installed here yet.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {machines.map((m) => (
+                <Link key={m.id} href={`/machines/${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'inherit', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                  <Wrench size={15} color="var(--primary-hover)" />
+                  <strong>{m.model || 'Unnamed unit'}</strong>
+                  {m.serial_number && <span className="text-muted" style={{ fontSize: '0.8125rem' }}>SN {m.serial_number}</span>}
+                  <span className="badge" style={{ marginLeft: 'auto' }}>{formatStatus(m.status)}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Consumable stock */}
+        <div className="glass glass-card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0 }}>Consumable stock</h3>
+            <button className="btn btn-secondary" onClick={() => setShowLogForm((v) => !v)}>
+              <Plus size={14} />
+            </button>
+          </div>
+
+          {showLogForm && (
+            <form onSubmit={logConsumption} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+              <select className="input" required value={logForm.product_id}
+                onChange={(e) => setLogForm({ ...logForm, product_id: e.target.value })}>
+                <option value="">Product…</option>
+                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <select className="input" value={logForm.type}
+                  onChange={(e) => setLogForm({ ...logForm, type: e.target.value })} style={{ flex: 1 }}>
+                  <option value="usage">Usage</option>
+                  <option value="delivery">Delivery</option>
+                  <option value="adjustment">Adjustment (set total)</option>
+                </select>
+                <input className="input" type="number" step="any" placeholder="Quantity" required value={logForm.quantity}
+                  onChange={(e) => setLogForm({ ...logForm, quantity: e.target.value })} style={{ flex: 1 }} />
+              </div>
+              <button type="submit" className="btn">Log entry</button>
+            </form>
+          )}
+
+          {!products.length ? (
+            <p className="text-muted">Add a product in the Products catalog first.</p>
+          ) : !stockData?.stock?.length ? (
+            <p className="text-muted">No stock tracked yet. Log a delivery to start.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {stockData.stock.map((s) => {
+                const dailyRate = Number(s.usage_last_60_days) / 60
+                const daysLeft = dailyRate > 0 ? Math.round(Number(s.quantity_on_hand) / dailyRate) : null
+                const needsReorder = Number(s.quantity_on_hand) < Number(s.reorder_threshold) ||
+                  (daysLeft !== null && daysLeft < Number(s.reorder_lead_time_days))
+                return (
+                  <div key={s.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <strong>{s.product_name}</strong>
+                      <span>{s.quantity_on_hand} {s.product_unit}</span>
+                    </div>
+                    <div className="text-muted" style={{ fontSize: '0.8125rem', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      {daysLeft !== null ? `~${daysLeft} days left at current usage` : 'Not enough usage history to forecast'}
+                      {needsReorder && (
+                        <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <AlertTriangle size={11} /> Reorder soon
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           )}
         </div>

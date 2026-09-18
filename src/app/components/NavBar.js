@@ -2,19 +2,22 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Building2, MessageSquare, ClipboardList, LogOut } from 'lucide-react'
+import { LayoutDashboard, TrendingUp, Building2, PackageSearch, ClipboardList, MoreHorizontal, LogOut } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 
 const LINKS = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
+  { href: '/insights', label: 'Insights', icon: TrendingUp },
   { href: '/facilities', label: 'Facilities', icon: Building2 },
-  { href: '/communications', label: 'Communications', icon: MessageSquare },
+  { href: '/orders', label: 'Orders', icon: PackageSearch },
   { href: '/tasks', label: 'Tasks', icon: ClipboardList },
+  { href: '/more', label: 'More', icon: MoreHorizontal, matches: ['/more', '/machines', '/communications', '/products'] },
 ]
 
-function isActive(pathname, href) {
-  if (href === '/') return pathname === '/'
-  return pathname.startsWith(href)
+function isActive(pathname, link) {
+  if (link.matches) return link.matches.some((m) => pathname.startsWith(m))
+  if (link.href === '/') return pathname === '/'
+  return pathname.startsWith(link.href)
 }
 
 export default function NavBar() {
@@ -49,7 +52,7 @@ export default function NavBar() {
             <Link
               key={link.href}
               href={link.href}
-              className={`top-bar-link ${isActive(pathname, link.href) ? 'is-active' : ''}`}
+              className={`top-bar-link ${isActive(pathname, link) ? 'is-active' : ''}`}
             >
               {link.label}
             </Link>
@@ -69,7 +72,7 @@ export default function NavBar() {
       <nav className="bottom-nav">
         {LINKS.map((link) => {
           const Icon = link.icon
-          const active = isActive(pathname, link.href)
+          const active = isActive(pathname, link)
           return (
             <Link
               key={link.href}
