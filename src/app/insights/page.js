@@ -5,15 +5,9 @@ import Link from 'next/link'
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Minus, Flame, Trophy, Droplets, Ship } from 'lucide-react'
-import { formatCompactCurrency, formatStatus, periodDelta } from '@/lib/format'
+import { Flame, Trophy, Droplets } from 'lucide-react'
+import { formatCompactCurrency, formatStatus } from '@/lib/format'
 import Briefing from '../components/Briefing'
-
-function daysUntil(dateStr) {
-  if (!dateStr) return null
-  const diffMs = new Date(dateStr).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)
-  return Math.round(diffMs / 86400000)
-}
 
 const MACHINE_STATUS_COLOR = {
   active: 'var(--success)',
@@ -32,19 +26,6 @@ const PO_STATUS_COLOR = {
 }
 
 const RANK_ACCENT = ['#facc15', '#cbd5e1', '#d97706'] // gold, silver, bronze
-
-function DeltaTag({ current, previous, invert }) {
-  const { pct, direction } = periodDelta(current, previous)
-  const isGood = invert ? direction === 'down' : direction === 'up'
-  const color = direction === 'flat' ? 'var(--muted)' : isGood ? 'var(--success)' : 'var(--danger)'
-  const Icon = direction === 'up' ? TrendingUp : direction === 'down' ? TrendingDown : Minus
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '0.75rem', color, fontWeight: 600 }}>
-      <Icon size={13} />
-      {pct === null ? 'new' : `${Math.abs(pct).toFixed(0)}%`}
-    </span>
-  )
-}
 
 function DemandTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null
@@ -129,10 +110,10 @@ export default function InsightsPage() {
   }
 
   const {
-    deltas, revenue_trend: revenueTrend, pipeline_by_stage: pipelineByStage,
+    revenue_trend: revenueTrend, pipeline_by_stage: pipelineByStage,
     machine_status_breakdown: machineStatus, po_status_breakdown: poStatus,
     at_risk_facilities: atRisk, fleet_demand_forecast: fleetDemand,
-    sourcing_stage_breakdown: sourcingStage, arriving_soon: arrivingSoon,
+    sourcing_stage_breakdown: sourcingStage,
   } = data
 
   const revenueChartData = revenueTrend.map((r) => ({
@@ -160,28 +141,6 @@ export default function InsightsPage() {
       {header}
 
       <Briefing />
-
-      <div className="metrics-grid">
-        <div className="glass glass-card">
-          <span className="metric-label">Revenue this month</span>
-          <div className="metric-value">{formatCompactCurrency(deltas.revenue_this_month)}</div>
-          <DeltaTag current={deltas.revenue_this_month} previous={deltas.revenue_last_month} />
-        </div>
-        <div className="glass glass-card">
-          <span className="metric-label">Action items opened (7d)</span>
-          <div className="metric-value">{deltas.items_this_week}</div>
-          <DeltaTag current={deltas.items_this_week} previous={deltas.items_last_week} invert />
-        </div>
-        <div className="glass glass-card">
-          <span className="metric-label">Communications (7d)</span>
-          <div className="metric-value">{deltas.comms_this_week}</div>
-          <DeltaTag current={deltas.comms_this_week} previous={deltas.comms_last_week} />
-        </div>
-        <div className="glass glass-card">
-          <span className="metric-label">Facilities at risk</span>
-          <div className="metric-value">{atRisk.length}</div>
-        </div>
-      </div>
 
       <div className="grid-responsive-2">
         {/* Power rankings */}
@@ -321,35 +280,8 @@ export default function InsightsPage() {
         </div>
       )}
 
-      {(arrivingSoon?.length > 0 || sourcingChartData.length > 0) && (
-        <div className="grid-responsive-2" style={{ marginTop: '1rem' }}>
-          <div className="glass glass-card">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: '1rem' }}>
-              <Ship size={16} color="var(--primary-hover)" />
-              <h3 style={{ margin: 0 }}>Arriving soon</h3>
-            </div>
-            {!arrivingSoon || arrivingSoon.length === 0 ? (
-              <p className="text-muted">Nothing due in the next 3 weeks.</p>
-            ) : (
-              <div className="row-list">
-                {arrivingSoon.map((o) => {
-                  const eta = daysUntil(o.expected_arrival_date)
-                  return (
-                    <Link key={o.id} href={`/sourcing/${o.id}`} className="row-card" style={{ textDecoration: 'none', color: 'inherit', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <strong>{o.supplier_name}</strong>
-                        <div className="text-muted" style={{ fontSize: '0.8125rem', display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
-                          {o.facility_name && <span>{o.facility_name}</span>}
-                          <span>{eta === 0 ? 'ETA today' : `ETA in ${eta} day${eta === 1 ? '' : 's'}`}</span>
-                        </div>
-                      </div>
-                    </Link>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-
+      {sourcingChartData.length > 0 && (
+        <div style={{ marginTop: '1rem' }}>
           <div className="glass glass-card">
             <h3>Sourcing pipeline</h3>
             {sourcingChartData.length === 0 ? <p className="text-muted">No sourcing orders yet.</p> : (

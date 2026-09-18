@@ -188,100 +188,79 @@ export default function FacilityDetailPage({ params }) {
       )}
 
       <div className="grid-responsive-2">
-        {/* Contacts */}
+        {/* Action items */}
         <div className="glass glass-card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0 }}>Contacts</h3>
-            <button className="btn btn-secondary" onClick={() => setShowContactForm((v) => !v)}>
-              <Plus size={14} />
-            </button>
-          </div>
-
-          {showContactForm && (
-            <form onSubmit={addContact} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
-              <input className="input" placeholder="Name" required value={contactForm.name}
-                onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })} />
-              <input className="input" placeholder="Title" value={contactForm.title}
-                onChange={(e) => setContactForm({ ...contactForm, title: e.target.value })} />
-              <input className="input" placeholder="Email" value={contactForm.email}
-                onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} />
-              <input className="input" placeholder="Phone" value={contactForm.phone}
-                onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })} />
-              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.875rem' }}>
-                <input type="checkbox" checked={contactForm.is_primary}
-                  onChange={(e) => setContactForm({ ...contactForm, is_primary: e.target.checked })} />
-                Primary contact
-              </label>
-              <button type="submit" className="btn">Add contact</button>
-            </form>
-          )}
-
-          {contacts.length === 0 ? (
-            <p style={{ color: 'var(--muted)' }}>No contacts yet.</p>
+          <h3>Action items</h3>
+          {actionItems.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>Nothing outstanding.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {contacts.map((c) => (
-                <div key={c.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {c.is_primary && <Star size={14} color="var(--warning)" fill="var(--warning)" />}
-                    <strong>{c.name}</strong>
-                    {c.title && <span style={{ color: 'var(--muted)' }}>— {c.title}</span>}
-                  </div>
-                  <div style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>
-                    {[c.email, c.phone].filter(Boolean).join(' · ')}
-                  </div>
-                </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {actionItems.map((item) => (
+                <label key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, opacity: item.status === 'done' ? 0.5 : 1 }}>
+                  <input type="checkbox" checked={item.status === 'done'} onChange={() => toggleActionItem(item)} style={{ marginTop: 4 }} />
+                  <span style={{ textDecoration: item.status === 'done' ? 'line-through' : 'none' }}>
+                    {item.description}
+                    {item.owner && <span style={{ color: 'var(--muted)' }}> — {item.owner}</span>}
+                    {item.due_date && <span style={{ color: 'var(--muted)' }}> (due {new Date(item.due_date).toLocaleDateString()})</span>}
+                  </span>
+                </label>
               ))}
             </div>
           )}
         </div>
 
-        {/* Projects */}
+        {/* Consumable stock */}
         <div className="glass glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0 }}>Projects</h3>
-            <button className="btn btn-secondary" onClick={() => setShowProjectForm((v) => !v)}>
+            <h3 style={{ margin: 0 }}>Consumable stock</h3>
+            <button className="btn btn-secondary" onClick={() => setShowLogForm((v) => !v)}>
               <Plus size={14} />
             </button>
           </div>
 
-          {showProjectForm && (
-            <form onSubmit={addProject} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
-              <input className="input" placeholder="Project title (e.g. Line 3 ultrasonic cell)" required
-                value={projectForm.title} onChange={(e) => setProjectForm({ ...projectForm, title: e.target.value })} />
-              <textarea className="input" placeholder="Spec summary" rows={3} value={projectForm.spec_summary}
-                onChange={(e) => setProjectForm({ ...projectForm, spec_summary: e.target.value })} />
+          {showLogForm && (
+            <form onSubmit={logConsumption} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+              <select className="input" required value={logForm.product_id}
+                onChange={(e) => setLogForm({ ...logForm, product_id: e.target.value })}>
+                <option value="">Product…</option>
+                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </select>
               <div style={{ display: 'flex', gap: 8 }}>
-                <input className="input" type="number" placeholder="Quote value" value={projectForm.quote_value}
-                  onChange={(e) => setProjectForm({ ...projectForm, quote_value: e.target.value })} style={{ flex: 1 }} />
-                <input className="input" type="date" value={projectForm.target_date}
-                  onChange={(e) => setProjectForm({ ...projectForm, target_date: e.target.value })} style={{ flex: 1 }} />
+                <select className="input" value={logForm.type}
+                  onChange={(e) => setLogForm({ ...logForm, type: e.target.value })} style={{ flex: 1 }}>
+                  <option value="usage">Usage</option>
+                  <option value="delivery">Delivery</option>
+                  <option value="adjustment">Adjustment (set total)</option>
+                </select>
+                <input className="input" type="number" step="any" placeholder="Quantity" required value={logForm.quantity}
+                  onChange={(e) => setLogForm({ ...logForm, quantity: e.target.value })} style={{ flex: 1 }} />
               </div>
-              <button type="submit" className="btn">Add project</button>
+              <button type="submit" className="btn">Log entry</button>
             </form>
           )}
 
-          {projects.length === 0 ? (
-            <p style={{ color: 'var(--muted)' }}>No projects yet.</p>
+          {!products.length ? (
+            <p className="text-muted">Add a product in the Products catalog first.</p>
+          ) : !stockData?.stock?.length ? (
+            <p className="text-muted">No stock tracked yet. Log a delivery to start.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {projects.map((p) => (
-                <div key={p.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+              {stockData.stock.map((s) => (
+                <div key={s.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong>{p.title}</strong>
-                    <select className="input" value={p.status} style={{ minWidth: 0, padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
-                      onChange={(e) => updateProjectStatus(p.id, e.target.value)}>
-                      {PROJECT_STATUSES.map((s) => <option key={s} value={s}>{formatStatus(s)}</option>)}
-                    </select>
+                    <strong>{s.product_name}</strong>
+                    <span>{s.quantity_on_hand} {s.product_unit}</span>
                   </div>
-                  {p.spec_summary && <p style={{ color: 'var(--muted)', fontSize: '0.875rem', marginTop: 4 }}>{p.spec_summary}</p>}
-                  {(p.quote_value || p.target_date) && (
-                    <div style={{ color: 'var(--muted)', fontSize: '0.75rem', marginTop: 4 }}>
-                      {p.quote_value && <span>${Number(p.quote_value).toLocaleString()}</span>}
-                      {p.quote_value && p.target_date && ' · '}
-                      {p.target_date && <span>Target {new Date(p.target_date).toLocaleDateString()}</span>}
-                    </div>
-                  )}
+                  <div className="text-muted" style={{ fontSize: '0.8125rem', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {s.days_left !== null
+                      ? `~${s.days_left} days left (from ${s.forecast_source})`
+                      : 'Not enough data to forecast — log usage or set fill cadence on machines'}
+                    {s.flagged && (
+                      <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <AlertTriangle size={11} /> Reorder soon
+                      </span>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -351,58 +330,52 @@ export default function FacilityDetailPage({ params }) {
           )}
         </div>
 
-        {/* Consumable stock */}
+        {/* Projects */}
         <div className="glass glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0 }}>Consumable stock</h3>
-            <button className="btn btn-secondary" onClick={() => setShowLogForm((v) => !v)}>
+            <h3 style={{ margin: 0 }}>Projects</h3>
+            <button className="btn btn-secondary" onClick={() => setShowProjectForm((v) => !v)}>
               <Plus size={14} />
             </button>
           </div>
 
-          {showLogForm && (
-            <form onSubmit={logConsumption} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
-              <select className="input" required value={logForm.product_id}
-                onChange={(e) => setLogForm({ ...logForm, product_id: e.target.value })}>
-                <option value="">Product…</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+          {showProjectForm && (
+            <form onSubmit={addProject} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+              <input className="input" placeholder="Project title (e.g. Line 3 ultrasonic cell)" required
+                value={projectForm.title} onChange={(e) => setProjectForm({ ...projectForm, title: e.target.value })} />
+              <textarea className="input" placeholder="Spec summary" rows={3} value={projectForm.spec_summary}
+                onChange={(e) => setProjectForm({ ...projectForm, spec_summary: e.target.value })} />
               <div style={{ display: 'flex', gap: 8 }}>
-                <select className="input" value={logForm.type}
-                  onChange={(e) => setLogForm({ ...logForm, type: e.target.value })} style={{ flex: 1 }}>
-                  <option value="usage">Usage</option>
-                  <option value="delivery">Delivery</option>
-                  <option value="adjustment">Adjustment (set total)</option>
-                </select>
-                <input className="input" type="number" step="any" placeholder="Quantity" required value={logForm.quantity}
-                  onChange={(e) => setLogForm({ ...logForm, quantity: e.target.value })} style={{ flex: 1 }} />
+                <input className="input" type="number" placeholder="Quote value" value={projectForm.quote_value}
+                  onChange={(e) => setProjectForm({ ...projectForm, quote_value: e.target.value })} style={{ flex: 1 }} />
+                <input className="input" type="date" value={projectForm.target_date}
+                  onChange={(e) => setProjectForm({ ...projectForm, target_date: e.target.value })} style={{ flex: 1 }} />
               </div>
-              <button type="submit" className="btn">Log entry</button>
+              <button type="submit" className="btn">Add project</button>
             </form>
           )}
 
-          {!products.length ? (
-            <p className="text-muted">Add a product in the Products catalog first.</p>
-          ) : !stockData?.stock?.length ? (
-            <p className="text-muted">No stock tracked yet. Log a delivery to start.</p>
+          {projects.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>No projects yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {stockData.stock.map((s) => (
-                <div key={s.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+              {projects.map((p) => (
+                <div key={p.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <strong>{s.product_name}</strong>
-                    <span>{s.quantity_on_hand} {s.product_unit}</span>
+                    <strong>{p.title}</strong>
+                    <select className="input" value={p.status} style={{ minWidth: 0, padding: '0.35rem 0.5rem', fontSize: '0.75rem' }}
+                      onChange={(e) => updateProjectStatus(p.id, e.target.value)}>
+                      {PROJECT_STATUSES.map((s) => <option key={s} value={s}>{formatStatus(s)}</option>)}
+                    </select>
                   </div>
-                  <div className="text-muted" style={{ fontSize: '0.8125rem', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    {s.days_left !== null
-                      ? `~${s.days_left} days left (from ${s.forecast_source})`
-                      : 'Not enough data to forecast — log usage or set fill cadence on machines'}
-                    {s.flagged && (
-                      <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <AlertTriangle size={11} /> Reorder soon
-                      </span>
-                    )}
-                  </div>
+                  {p.spec_summary && <p style={{ color: 'var(--muted)', fontSize: '0.875rem', marginTop: 4 }}>{p.spec_summary}</p>}
+                  {(p.quote_value || p.target_date) && (
+                    <div style={{ color: 'var(--muted)', fontSize: '0.75rem', marginTop: 4 }}>
+                      {p.quote_value && <span>${Number(p.quote_value).toLocaleString()}</span>}
+                      {p.quote_value && p.target_date && ' · '}
+                      {p.target_date && <span>Target {new Date(p.target_date).toLocaleDateString()}</span>}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -411,22 +384,49 @@ export default function FacilityDetailPage({ params }) {
       </div>
 
       <div className="grid-responsive-2" style={{ marginTop: '2rem' }}>
-        {/* Action items */}
+        {/* Contacts */}
         <div className="glass glass-card">
-          <h3>Action items</h3>
-          {actionItems.length === 0 ? (
-            <p style={{ color: 'var(--muted)' }}>Nothing outstanding.</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <h3 style={{ margin: 0 }}>Contacts</h3>
+            <button className="btn btn-secondary" onClick={() => setShowContactForm((v) => !v)}>
+              <Plus size={14} />
+            </button>
+          </div>
+
+          {showContactForm && (
+            <form onSubmit={addContact} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+              <input className="input" placeholder="Name" required value={contactForm.name}
+                onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })} />
+              <input className="input" placeholder="Title" value={contactForm.title}
+                onChange={(e) => setContactForm({ ...contactForm, title: e.target.value })} />
+              <input className="input" placeholder="Email" value={contactForm.email}
+                onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} />
+              <input className="input" placeholder="Phone" value={contactForm.phone}
+                onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })} />
+              <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.875rem' }}>
+                <input type="checkbox" checked={contactForm.is_primary}
+                  onChange={(e) => setContactForm({ ...contactForm, is_primary: e.target.checked })} />
+                Primary contact
+              </label>
+              <button type="submit" className="btn">Add contact</button>
+            </form>
+          )}
+
+          {contacts.length === 0 ? (
+            <p style={{ color: 'var(--muted)' }}>No contacts yet.</p>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {actionItems.map((item) => (
-                <label key={item.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, opacity: item.status === 'done' ? 0.5 : 1 }}>
-                  <input type="checkbox" checked={item.status === 'done'} onChange={() => toggleActionItem(item)} style={{ marginTop: 4 }} />
-                  <span style={{ textDecoration: item.status === 'done' ? 'line-through' : 'none' }}>
-                    {item.description}
-                    {item.owner && <span style={{ color: 'var(--muted)' }}> — {item.owner}</span>}
-                    {item.due_date && <span style={{ color: 'var(--muted)' }}> (due {new Date(item.due_date).toLocaleDateString()})</span>}
-                  </span>
-                </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {contacts.map((c) => (
+                <div key={c.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    {c.is_primary && <Star size={14} color="var(--warning)" fill="var(--warning)" />}
+                    <strong>{c.name}</strong>
+                    {c.title && <span style={{ color: 'var(--muted)' }}>— {c.title}</span>}
+                  </div>
+                  <div style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>
+                    {[c.email, c.phone].filter(Boolean).join(' · ')}
+                  </div>
+                </div>
               ))}
             </div>
           )}
@@ -457,6 +457,7 @@ export default function FacilityDetailPage({ params }) {
           )}
         </div>
       </div>
+
     </main>
   )
 }

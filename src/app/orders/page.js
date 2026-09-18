@@ -109,7 +109,7 @@ export default function OrdersPage() {
 
       <MetricStrip screen="orders" />
 
-      <div className="input-group">
+      <div className="filter-row">
         {[
           { value: '', label: 'All' },
           { value: 'incoming', label: 'To customer' },

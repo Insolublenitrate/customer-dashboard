@@ -86,6 +86,16 @@ export default function SourcingPage() {
     }
   }
 
+  // Derived from the list already on screen rather than a second query —
+  // this is the same set the Insights page used to carry.
+  const arrivingSoon = orders
+    .filter((o) => {
+      if (['arrived', 'installed'].includes(o.stage) || !o.expected_arrival_date) return false
+      const eta = daysUntil(o.expected_arrival_date)
+      return eta >= 0 && eta < 21
+    })
+    .sort((a, b) => new Date(a.expected_arrival_date) - new Date(b.expected_arrival_date))
+
   return (
     <main className="container">
       <div className="dashboard-header">
@@ -101,7 +111,7 @@ export default function SourcingPage() {
 
       <MetricStrip screen="sourcing" />
 
-      <div className="input-group">
+      <div className="filter-row">
         <button className={`btn ${stageFilter === '' ? '' : 'btn-secondary'}`} onClick={() => setStageFilter('')}>All</button>
         {SOURCING_STAGES.map((s) => (
           <button key={s} className={`btn ${stageFilter === s ? '' : 'btn-secondary'}`} onClick={() => setStageFilter(s)} style={{ whiteSpace: 'nowrap' }}>
@@ -109,6 +119,28 @@ export default function SourcingPage() {
           </button>
         ))}
       </div>
+
+      {arrivingSoon.length > 0 && (
+        <div className="glass glass-card" style={{ marginBottom: '1rem' }}>
+          <h3 style={{ marginBottom: '0.75rem' }}>Arriving soon</h3>
+          <div className="row-list">
+            {arrivingSoon.map((o) => {
+              const eta = daysUntil(o.expected_arrival_date)
+              return (
+                <Link key={o.id} href={`/sourcing/${o.id}`} className="row-card" style={{ textDecoration: 'none', color: 'inherit', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <strong>{o.supplier_name}</strong>
+                    <div className="text-muted" style={{ fontSize: '0.8125rem', display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
+                      {o.facility_name && <span>{o.facility_name}</span>}
+                      <span>{eta === 0 ? 'ETA today' : `ETA in ${eta} day${eta === 1 ? '' : 's'}`}</span>
+                    </div>
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="loader" />

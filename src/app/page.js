@@ -4,8 +4,9 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { Building2, ClipboardList, MessageSquare, AlertTriangle, DollarSign, PackageSearch, Ship } from 'lucide-react'
+import { Ship } from 'lucide-react'
 import { formatCompactCurrency } from '@/lib/format'
+import MetricStrip from './components/MetricStrip'
 
 const USMap = dynamic(() => import('./components/USMap'), { ssr: false })
 
@@ -68,61 +69,18 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="metrics-grid">
-        <div className="glass glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <Building2 size={18} color="var(--primary-hover)" />
-            <span className="metric-label">Facilities</span>
-          </div>
-          <div className="metric-value">{stats.facility_count}</div>
-        </div>
-        <div className="glass glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <ClipboardList size={18} color="var(--accent)" />
-            <span className="metric-label">Active projects</span>
-          </div>
-          <div className="metric-value">{stats.active_project_count}</div>
-        </div>
-        <div className="glass glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <DollarSign size={18} color="var(--success)" />
-            <span className="metric-label">Pipeline value</span>
-          </div>
-          <div className="metric-value">{formatCompactCurrency(stats.pipeline_value)}</div>
-        </div>
-        <div className="glass glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <PackageSearch size={18} color="var(--warning)" />
-            <span className="metric-label">Open orders</span>
-          </div>
-          <div className="metric-value">{formatCompactCurrency(Number(stats.open_incoming_po_value) + Number(stats.open_outgoing_po_value))}</div>
-        </div>
-        <div className="glass glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <AlertTriangle size={18} color="var(--danger)" />
-            <span className="metric-label">Needs attention</span>
-          </div>
-          <div className="metric-value">{attentionCount}</div>
-        </div>
-        <div className="glass glass-card">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <MessageSquare size={18} color="var(--success)" />
-            <span className="metric-label">Communications (7d)</span>
-          </div>
-          <div className="metric-value">{stats.recent_communication_count}</div>
-        </div>
-      </div>
+      <MetricStrip
+        metrics={[
+          { label: 'Needs attention', value: attentionCount, tone: attentionCount > 0 ? 'danger' : 'default' },
+          { label: 'Pipeline value', value: stats.pipeline_value, format: 'currency' },
+          { label: 'Open orders', value: Number(stats.open_incoming_po_value) + Number(stats.open_outgoing_po_value), format: 'currency' },
+          { label: 'Active projects', value: stats.active_project_count },
+          { label: 'Facilities', value: stats.facility_count },
+          { label: 'Communications (7d)', value: stats.recent_communication_count },
+        ]}
+      />
 
       <div className="grid-responsive-2">
-        <div className="glass glass-card map-card">
-          <h3>Facility locations</h3>
-          {facilities.length === 0 ? (
-            <p className="text-muted">No facilities yet — add one to see it on the map.</p>
-          ) : (
-            <USMap facilities={facilities} />
-          )}
-        </div>
-
         <div className="glass glass-card">
           <h3>Needs attention</h3>
           {attentionCount === 0 ? (
@@ -166,6 +124,15 @@ export default function Dashboard() {
                 </Link>
               ))}
             </div>
+          )}
+        </div>
+
+        <div className="glass glass-card map-card">
+          <h3>Facility locations</h3>
+          {facilities.length === 0 ? (
+            <p className="text-muted">No facilities yet — add one to see it on the map.</p>
+          ) : (
+            <USMap facilities={facilities} />
           )}
         </div>
       </div>

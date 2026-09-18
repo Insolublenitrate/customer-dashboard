@@ -17,12 +17,15 @@ function formatValue(metric) {
   return value.toLocaleString()
 }
 
-// A screen's own headline numbers, pulled live from /api/screen-metrics.
-// `facilityId` is only used by the facility detail screen.
-export default function MetricStrip({ screen, facilityId }) {
-  const [metrics, setMetrics] = useState(null)
+// A screen's own headline numbers. Pass `screen` to fetch them from
+// /api/screen-metrics, or `metrics` directly when the page already holds the
+// figures and a second round trip would be waste.
+export default function MetricStrip({ screen, facilityId, metrics: provided }) {
+  const [fetched, setFetched] = useState(null)
 
   useEffect(() => {
+    if (provided || !screen) return undefined
+
     const params = new URLSearchParams({ screen })
     if (facilityId) params.set('facility_id', facilityId)
 
@@ -30,12 +33,14 @@ export default function MetricStrip({ screen, facilityId }) {
     fetch(`/api/screen-metrics?${params}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load metrics'))))
       .then((data) => {
-        if (!cancelled) setMetrics(data.metrics || [])
+        if (!cancelled) setFetched(data.metrics || [])
       })
       .catch((err) => console.error('Failed to load screen metrics:', err))
 
     return () => { cancelled = true }
-  }, [screen, facilityId])
+  }, [screen, facilityId, provided])
+
+  const metrics = provided || fetched
 
   // The strip is supporting detail, so a failure stays silent rather than
   // pushing an error banner above the screen's actual content.

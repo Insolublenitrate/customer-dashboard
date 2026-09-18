@@ -46,7 +46,7 @@ export default function TasksPage() {
 
       <MetricStrip screen="tasks" />
 
-      <div className="input-group">
+      <div className="filter-row">
         {[
           { value: 'open', label: 'Open' },
           { value: 'done', label: 'Done' },

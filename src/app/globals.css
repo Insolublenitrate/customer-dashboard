@@ -453,6 +453,26 @@ a.glass-card:hover,
   animation: spin 1s linear infinite;
 }
 
+/* Filter chips. Distinct from .input-group, which stacks its children on
+   mobile — right for form selects, wrong for a row of filters: nine stage
+   chips became nine full-width buttons and pushed the list off-screen. */
+.filter-row {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.filter-row::-webkit-scrollbar {
+  display: none;
+}
+
+.filter-row > * {
+  flex: 0 0 auto;
+}
+
 /* Per-screen metric strip */
 .metric-strip {
   display: flex;
@@ -535,8 +555,9 @@ a.glass-card:hover,
     padding: 1rem;
   }
 
-  /* Strip scrolls sideways on a phone instead of squeezing every tile. */
-  .metric-strip {
+  /* Strip and filters scroll sideways on a phone instead of stacking. */
+  .metric-strip,
+  .filter-row {
     margin-left: -1rem;
     margin-right: -1rem;
     padding: 0 1rem;
