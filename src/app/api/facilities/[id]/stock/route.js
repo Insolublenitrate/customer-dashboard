@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
 import { CONSUMPTION_LOG_TYPES } from '@/lib/constants'
+import { computeStockForecast } from '@/lib/consumption'
 
 export async function GET(request, { params }) {
   const { unauthorized } = await requireSession()
@@ -17,7 +18,16 @@ export async function GET(request, { params }) {
              SELECT SUM(-quantity) FROM consumption_logs
              WHERE facility_id = cs.facility_id AND product_id = cs.product_id
                AND type = 'usage' AND logged_at > NOW() - INTERVAL '60 days'
-           ), 0) AS usage_last_60_days
+           ), 0) AS usage_last_60_days,
+           COALESCE((
+             -- Theoretical draw for machines running this product: 10% of each
+             -- tank fill is detergent (see DETERGENT_RATIO in src/lib/consumption.js).
+             SELECT SUM(m.tank_capacity * 0.10 * m.fill_frequency_per_week)
+             FROM machines m
+             WHERE m.facility_id = cs.facility_id AND m.default_product_id = cs.product_id
+               AND m.status IN ('active', 'needs_service')
+               AND m.tank_capacity IS NOT NULL AND m.fill_frequency_per_week IS NOT NULL
+           ), 0) AS planned_weekly_usage
          FROM consumable_stock cs
          JOIN products p ON p.id = cs.product_id
          WHERE cs.facility_id = $1
@@ -35,7 +45,18 @@ export async function GET(request, { params }) {
         [id]
       )
 
-      return { stock: stock.rows, consumption_logs: logs.rows }
+      const stockWithForecast = stock.rows.map((s) => ({
+        ...s,
+        ...computeStockForecast({
+          quantityOnHand: s.quantity_on_hand,
+          reorderThreshold: s.reorder_threshold,
+          usageLast60Days: s.usage_last_60_days,
+          reorderLeadTimeDays: s.reorder_lead_time_days,
+          plannedWeeklyUsage: s.planned_weekly_usage,
+        }),
+      }))
+
+      return { stock: stockWithForecast, consumption_logs: logs.rows }
     })
 
     return NextResponse.json(data)

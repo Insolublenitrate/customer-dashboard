@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { computeStockForecast } from '@/lib/consumption'
 
 export async function GET() {
   const { unauthorized } = await requireSession()
@@ -34,7 +35,14 @@ export async function GET() {
               SELECT SUM(-quantity) FROM consumption_logs
               WHERE facility_id = cs.facility_id AND product_id = cs.product_id
                 AND type = 'usage' AND logged_at > NOW() - INTERVAL '60 days'
-            ), 0) AS usage_last_60_days
+            ), 0) AS usage_last_60_days,
+            COALESCE((
+              SELECT SUM(m.tank_capacity * 0.10 * m.fill_frequency_per_week)
+              FROM machines m
+              WHERE m.facility_id = cs.facility_id AND m.default_product_id = cs.product_id
+                AND m.status IN ('active', 'needs_service')
+                AND m.tank_capacity IS NOT NULL AND m.fill_frequency_per_week IS NOT NULL
+            ), 0) AS planned_weekly_usage
           FROM consumable_stock cs
           JOIN facilities f ON f.id = cs.facility_id
           JOIN products p ON p.id = cs.product_id
@@ -49,13 +57,16 @@ export async function GET() {
       ])
 
       const needsReorder = stock.rows
-        .map((s) => {
-          const dailyRate = Number(s.usage_last_60_days) / 60
-          const daysLeft = dailyRate > 0 ? Math.round(Number(s.quantity_on_hand) / dailyRate) : null
-          const flagged = Number(s.quantity_on_hand) < Number(s.reorder_threshold) ||
-            (daysLeft !== null && daysLeft < Number(s.reorder_lead_time_days))
-          return { ...s, days_left: daysLeft, flagged }
-        })
+        .map((s) => ({
+          ...s,
+          ...computeStockForecast({
+            quantityOnHand: s.quantity_on_hand,
+            reorderThreshold: s.reorder_threshold,
+            usageLast60Days: s.usage_last_60_days,
+            reorderLeadTimeDays: s.reorder_lead_time_days,
+            plannedWeeklyUsage: s.planned_weekly_usage,
+          }),
+        }))
         .filter((s) => s.flagged)
 
       return {

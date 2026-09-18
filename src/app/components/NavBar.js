@@ -11,7 +11,7 @@ const LINKS = [
   { href: '/facilities', label: 'Facilities', icon: Building2 },
   { href: '/orders', label: 'Orders', icon: PackageSearch },
   { href: '/tasks', label: 'Tasks', icon: ClipboardList },
-  { href: '/more', label: 'More', icon: MoreHorizontal, matches: ['/more', '/machines', '/communications', '/products'] },
+  { href: '/more', label: 'More', icon: MoreHorizontal, matches: ['/more', '/machines', '/machine-models', '/communications', '/products'] },
 ]
 
 function isActive(pathname, link) {

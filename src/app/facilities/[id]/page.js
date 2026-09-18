@@ -7,7 +7,7 @@ import { PROJECT_STATUSES, MACHINE_STATUSES } from '@/lib/constants'
 
 const emptyContact = { name: '', title: '', email: '', phone: '', is_primary: false }
 const emptyProject = { title: '', spec_summary: '', status: 'discovery', quote_value: '', target_date: '' }
-const emptyMachine = { serial_number: '', model: '', install_date: '', status: 'active', default_product_id: '' }
+const emptyMachine = { machine_model_id: '', serial_number: '', model: '', install_date: '', status: 'active', default_product_id: '', tank_capacity: '', fill_frequency_per_week: '' }
 const emptyLog = { product_id: '', type: 'usage', quantity: '', notes: '' }
 
 function formatStatus(status) {
@@ -20,6 +20,7 @@ export default function FacilityDetailPage({ params }) {
   const [stockData, setStockData] = useState(null)
   const [machines, setMachines] = useState([])
   const [products, setProducts] = useState([])
+  const [machineModels, setMachineModels] = useState([])
   const [loading, setLoading] = useState(true)
   const [showContactForm, setShowContactForm] = useState(false)
   const [showProjectForm, setShowProjectForm] = useState(false)
@@ -36,12 +37,14 @@ export default function FacilityDetailPage({ params }) {
       fetch(`/api/facilities/${id}/stock`).then((res) => (res.ok ? res.json() : { stock: [], consumption_logs: [] })),
       fetch(`/api/machines?facility_id=${id}`).then((res) => (res.ok ? res.json() : { machines: [] })),
       fetch('/api/products').then((res) => (res.ok ? res.json() : { products: [] })),
+      fetch('/api/machine-models').then((res) => (res.ok ? res.json() : { machine_models: [] })),
     ])
-      .then(([facilityData, stock, machinesData, productsData]) => {
+      .then(([facilityData, stock, machinesData, productsData, machineModelsData]) => {
         setData(facilityData)
         setStockData(stock)
         setMachines(machinesData.machines || [])
         setProducts(productsData.products || [])
+        setMachineModels(machineModelsData.machine_models || [])
       })
       .catch((err) => console.error('Failed to load facility:', err))
       .finally(() => setLoading(false))
@@ -51,6 +54,17 @@ export default function FacilityDetailPage({ params }) {
     fetchData()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
+
+  const applyMachineModel = (machineModelId) => {
+    const model = machineModels.find((m) => String(m.id) === machineModelId)
+    setMachineForm((f) => ({
+      ...f,
+      machine_model_id: machineModelId,
+      model: model ? model.name : f.model,
+      tank_capacity: model ? model.tank_capacity : f.tank_capacity,
+      fill_frequency_per_week: model?.fill_frequency_per_week ?? f.fill_frequency_per_week,
+    }))
+  }
 
   const addMachine = async (e) => {
     e.preventDefault()
@@ -279,6 +293,12 @@ export default function FacilityDetailPage({ params }) {
 
           {showMachineForm && (
             <form onSubmit={addMachine} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+              {machineModels.length > 0 && (
+                <select className="input" value={machineForm.machine_model_id} onChange={(e) => applyMachineModel(e.target.value)}>
+                  <option value="">Machine model (optional, prefills size)…</option>
+                  {machineModels.map((m) => <option key={m.id} value={m.id}>{m.name} — {Number(m.tank_capacity).toLocaleString()} gal</option>)}
+                </select>
+              )}
               <input className="input" placeholder="Model / designation" value={machineForm.model}
                 onChange={(e) => setMachineForm({ ...machineForm, model: e.target.value })} />
               <input className="input" placeholder="Serial number" value={machineForm.serial_number}
@@ -296,6 +316,12 @@ export default function FacilityDetailPage({ params }) {
                 <option value="">Detergent used (optional)…</option>
                 {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input className="input" type="number" step="any" placeholder="Tank capacity (gal)" value={machineForm.tank_capacity}
+                  onChange={(e) => setMachineForm({ ...machineForm, tank_capacity: e.target.value })} style={{ flex: '1 1 140px' }} />
+                <input className="input" type="number" step="any" placeholder="Fills per week" value={machineForm.fill_frequency_per_week}
+                  onChange={(e) => setMachineForm({ ...machineForm, fill_frequency_per_week: e.target.value })} style={{ flex: '1 1 140px' }} />
+              </div>
               <button type="submit" className="btn">Add machine</button>
             </form>
           )}
@@ -305,10 +331,11 @@ export default function FacilityDetailPage({ params }) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {machines.map((m) => (
-                <Link key={m.id} href={`/machines/${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'inherit', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                <Link key={m.id} href={`/machines/${m.id}`} style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'inherit', borderBottom: '1px solid var(--border)', paddingBottom: 8, flexWrap: 'wrap' }}>
                   <Wrench size={15} color="var(--primary-hover)" />
                   <strong>{m.model || 'Unnamed unit'}</strong>
                   {m.serial_number && <span className="text-muted" style={{ fontSize: '0.8125rem' }}>SN {m.serial_number}</span>}
+                  {m.tank_capacity && <span className="text-muted" style={{ fontSize: '0.8125rem' }}>{Number(m.tank_capacity).toLocaleString()} gal</span>}
                   <span className="badge" style={{ marginLeft: 'auto' }}>{formatStatus(m.status)}</span>
                 </Link>
               ))}
@@ -352,28 +379,24 @@ export default function FacilityDetailPage({ params }) {
             <p className="text-muted">No stock tracked yet. Log a delivery to start.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {stockData.stock.map((s) => {
-                const dailyRate = Number(s.usage_last_60_days) / 60
-                const daysLeft = dailyRate > 0 ? Math.round(Number(s.quantity_on_hand) / dailyRate) : null
-                const needsReorder = Number(s.quantity_on_hand) < Number(s.reorder_threshold) ||
-                  (daysLeft !== null && daysLeft < Number(s.reorder_lead_time_days))
-                return (
-                  <div key={s.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <strong>{s.product_name}</strong>
-                      <span>{s.quantity_on_hand} {s.product_unit}</span>
-                    </div>
-                    <div className="text-muted" style={{ fontSize: '0.8125rem', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
-                      {daysLeft !== null ? `~${daysLeft} days left at current usage` : 'Not enough usage history to forecast'}
-                      {needsReorder && (
-                        <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                          <AlertTriangle size={11} /> Reorder soon
-                        </span>
-                      )}
-                    </div>
+              {stockData.stock.map((s) => (
+                <div key={s.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <strong>{s.product_name}</strong>
+                    <span>{s.quantity_on_hand} {s.product_unit}</span>
                   </div>
-                )
-              })}
+                  <div className="text-muted" style={{ fontSize: '0.8125rem', marginTop: 2, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    {s.days_left !== null
+                      ? `~${s.days_left} days left (from ${s.forecast_source})`
+                      : 'Not enough data to forecast — log usage or set fill cadence on machines'}
+                    {s.flagged && (
+                      <span className="badge badge-warning" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <AlertTriangle size={11} /> Reorder soon
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

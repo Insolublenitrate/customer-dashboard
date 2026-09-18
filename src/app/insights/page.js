@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Minus, Flame, Trophy } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Flame, Trophy, Droplets } from 'lucide-react'
 import { formatCompactCurrency, formatStatus, periodDelta } from '@/lib/format'
 
 const MACHINE_STATUS_COLOR = {
@@ -36,6 +36,21 @@ function DeltaTag({ current, previous, invert }) {
       <Icon size={13} />
       {pct === null ? 'new' : `${Math.abs(pct).toFixed(0)}%`}
     </span>
+  )
+}
+
+function DemandTooltip({ active, payload, label }) {
+  if (!active || !payload?.length) return null
+  const unit = payload[0]?.payload?.unit || 'units'
+  return (
+    <div className="glass" style={{ padding: '0.5rem 0.75rem', border: '1px solid var(--border-strong)' }}>
+      <div className="text-muted" style={{ fontSize: '0.75rem' }}>{label}</div>
+      {payload.map((p, i) => (
+        <div key={i} style={{ fontWeight: 600, color: p.color }}>
+          {p.name}: {Number(p.value).toLocaleString(undefined, { maximumFractionDigits: 1 })} {unit}/wk
+        </div>
+      ))}
+    </div>
   )
 }
 
@@ -92,7 +107,11 @@ export default function InsightsPage() {
     )
   }
 
-  const { deltas, revenue_trend: revenueTrend, pipeline_by_stage: pipelineByStage, machine_status_breakdown: machineStatus, po_status_breakdown: poStatus, at_risk_facilities: atRisk } = data
+  const {
+    deltas, revenue_trend: revenueTrend, pipeline_by_stage: pipelineByStage,
+    machine_status_breakdown: machineStatus, po_status_breakdown: poStatus,
+    at_risk_facilities: atRisk, fleet_demand_forecast: fleetDemand,
+  } = data
 
   const revenueChartData = revenueTrend.map((r) => ({
     month: new Date(r.month).toLocaleDateString('en-US', { month: 'short' }),
@@ -100,6 +119,10 @@ export default function InsightsPage() {
   }))
 
   const pipelineChartData = pipelineByStage.filter((p) => p.count > 0).map((p) => ({ stage: formatStatus(p.status), count: p.count }))
+
+  const demandChartData = (fleetDemand || []).map((p) => ({
+    name: p.name, unit: p.unit, planned: p.planned_weekly_volume, actual: p.actual_weekly_volume,
+  }))
 
   const machineStatusData = machineStatus.map((m) => ({ status: m.status, label: formatStatus(m.status), count: Number(m.count) }))
   const poStatusTotals = {}
@@ -240,6 +263,40 @@ export default function InsightsPage() {
               </AreaChart>
             </ResponsiveContainer>
           </div>
+        </div>
+      )}
+
+      {demandChartData.length > 0 && (
+        <div className="glass glass-card" style={{ marginTop: '1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Droplets size={16} color="var(--accent)" />
+              <h3 style={{ margin: 0 }}>Fleet detergent demand — planned vs. logged</h3>
+            </div>
+            <div style={{ display: 'flex', gap: 12, fontSize: '0.75rem' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 999, background: '#ea580c', display: 'inline-block' }} /> Planned (tank × 10% × fill cadence)
+              </span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 999, background: '#0891b2', display: 'inline-block' }} /> Logged (last 7d)
+              </span>
+            </div>
+          </div>
+          <div style={{ width: '100%', height: Math.max(140, demandChartData.length * 48) }}>
+            <ResponsiveContainer>
+              <BarChart data={demandChartData} layout="vertical" margin={{ top: 12, right: 16, left: 0, bottom: 0 }} barSize={12} barGap={4}>
+                <CartesianGrid horizontal={false} stroke="var(--border)" />
+                <XAxis type="number" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <YAxis type="category" dataKey="name" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={110} />
+                <Tooltip content={<DemandTooltip />} cursor={{ fill: 'var(--surface-hover)' }} />
+                <Bar dataKey="planned" name="Planned" fill="#ea580c" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="actual" name="Logged" fill="#0891b2" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: 8 }}>
+            A big gap means usage isn&apos;t being logged as often as machines are actually running — or a facility is under-ordering against its fleet size.
+          </p>
         </div>
       )}
 

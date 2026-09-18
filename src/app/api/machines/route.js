@@ -13,10 +13,11 @@ export async function GET(request) {
   try {
     const rows = await withClient(async (client) => {
       let query = `
-        SELECT m.*, f.name AS facility_name, p.name AS default_product_name
+        SELECT m.*, f.name AS facility_name, p.name AS default_product_name, mm.name AS machine_model_name
         FROM machines m
         JOIN facilities f ON f.id = m.facility_id
         LEFT JOIN products p ON p.id = m.default_product_id
+        LEFT JOIN machine_models mm ON mm.id = m.machine_model_id
       `
       const params = []
       if (facilityId) {
@@ -49,18 +50,20 @@ export async function POST(request) {
 
     const machine = await withClient(async (client) => {
       const result = await client.query(
-        `INSERT INTO machines (facility_id, project_id, serial_number, model, install_date, status, default_product_id, tank_capacity, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `INSERT INTO machines (facility_id, project_id, machine_model_id, serial_number, model, install_date, status, default_product_id, tank_capacity, fill_frequency_per_week, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
           body.facility_id,
           body.project_id || null,
+          body.machine_model_id || null,
           body.serial_number || null,
           body.model || null,
           body.install_date || null,
           status,
           body.default_product_id || null,
           body.tank_capacity || null,
+          body.fill_frequency_per_week || null,
           body.notes || null,
         ]
       )

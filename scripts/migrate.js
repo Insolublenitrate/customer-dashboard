@@ -115,22 +115,41 @@ async function migrate() {
     );
   `)
 
+  console.log('Creating machine_models...')
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS machine_models (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      tank_capacity NUMERIC NOT NULL,
+      fill_frequency_per_week NUMERIC,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
   console.log('Creating machines...')
   await client.query(`
     CREATE TABLE IF NOT EXISTS machines (
       id SERIAL PRIMARY KEY,
       facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
       project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+      machine_model_id INTEGER REFERENCES machine_models(id) ON DELETE SET NULL,
       serial_number TEXT,
       model TEXT,
       install_date DATE,
       status TEXT NOT NULL DEFAULT 'active',
       default_product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
       tank_capacity NUMERIC,
+      fill_frequency_per_week NUMERIC,
       notes TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
   `)
+
+  // Existing deployments already have `machines` without these columns —
+  // idempotent for installs created before machine models/sizing existed.
+  await client.query(`ALTER TABLE machines ADD COLUMN IF NOT EXISTS machine_model_id INTEGER REFERENCES machine_models(id) ON DELETE SET NULL;`)
+  await client.query(`ALTER TABLE machines ADD COLUMN IF NOT EXISTS fill_frequency_per_week NUMERIC;`)
 
   console.log('Creating consumable_stock...')
   await client.query(`

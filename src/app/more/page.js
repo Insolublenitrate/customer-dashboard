@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { Wrench, MessageSquare, Package } from 'lucide-react'
+import { Wrench, MessageSquare, Package, Boxes } from 'lucide-react'
 
 const LINKS = [
   { href: '/machines', label: 'Machines', description: 'Every installed unit, across all facilities.', icon: Wrench },
+  { href: '/machine-models', label: 'Machine models', description: 'The size/model catalog — tank capacity and fill cadence.', icon: Boxes },
   { href: '/communications', label: 'Communications', description: 'Upload meeting minutes and emails.', icon: MessageSquare },
   { href: '/products', label: 'Products', description: 'The detergent/parts catalog.', icon: Package },
 ]

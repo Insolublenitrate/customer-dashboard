@@ -4,6 +4,7 @@ import { useEffect, useState, use as usePromise } from 'react'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { MACHINE_STATUSES } from '@/lib/constants'
+import { detergentPerFill, theoreticalWeeklyUsage } from '@/lib/consumption'
 
 function formatStatus(status) {
   return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -56,6 +57,8 @@ export default function MachineDetailPage({ params }) {
   }
 
   const { machine, consumption_logs: logs } = data
+  const perFill = detergentPerFill(machine.tank_capacity)
+  const weeklyUsage = theoreticalWeeklyUsage(machine)
 
   return (
     <main className="container">
@@ -81,8 +84,18 @@ export default function MachineDetailPage({ params }) {
           <h3>Details</h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.9375rem' }}>
             <div><span className="text-muted">Install date: </span>{machine.install_date ? new Date(machine.install_date).toLocaleDateString() : '—'}</div>
+            {machine.machine_model_name && (
+              <div><span className="text-muted">Machine model: </span>{machine.machine_model_name}</div>
+            )}
             <div><span className="text-muted">Detergent: </span>{machine.default_product_name || '—'}</div>
-            <div><span className="text-muted">Tank capacity: </span>{machine.tank_capacity || '—'}</div>
+            <div><span className="text-muted">Tank capacity: </span>{machine.tank_capacity ? `${Number(machine.tank_capacity).toLocaleString()} gal` : '—'}</div>
+            <div><span className="text-muted">Fill cadence: </span>{machine.fill_frequency_per_week ? `~${machine.fill_frequency_per_week} fills/week` : '—'}</div>
+            {perFill !== null && (
+              <div><span className="text-muted">Detergent per fill: </span>~{perFill.toLocaleString(undefined, { maximumFractionDigits: 1 })} gal (10% of tank)</div>
+            )}
+            {weeklyUsage > 0 && (
+              <div><span className="text-muted">Planned weekly draw: </span>~{weeklyUsage.toLocaleString(undefined, { maximumFractionDigits: 1 })} gal</div>
+            )}
             {machine.project_title && (
               <div><span className="text-muted">Built from project: </span>{machine.project_title}</div>
             )}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
 import { PROJECT_STATUSES } from '@/lib/constants'
+import { computeStockForecast } from '@/lib/consumption'
 
 export async function GET() {
   const { unauthorized } = await requireSession()
@@ -9,7 +10,7 @@ export async function GET() {
 
   try {
     const data = await withClient(async (client) => {
-      const [leaderboard, stock, deltas, revenueTrend, pipelineByStage, machineStatus, poStatus] = await Promise.all([
+      const [leaderboard, stock, deltas, revenueTrend, pipelineByStage, machineStatus, poStatus, fleetDemand] = await Promise.all([
         client.query(`
           SELECT
             f.id, f.name, f.is_mother_location,
@@ -27,7 +28,14 @@ export async function GET() {
               SELECT SUM(-quantity) FROM consumption_logs
               WHERE facility_id = cs.facility_id AND product_id = cs.product_id
                 AND type = 'usage' AND logged_at > NOW() - INTERVAL '60 days'
-            ), 0) AS usage_last_60_days
+            ), 0) AS usage_last_60_days,
+            COALESCE((
+              SELECT SUM(m.tank_capacity * 0.10 * m.fill_frequency_per_week)
+              FROM machines m
+              WHERE m.facility_id = cs.facility_id AND m.default_product_id = cs.product_id
+                AND m.status IN ('active', 'needs_service')
+                AND m.tank_capacity IS NOT NULL AND m.fill_frequency_per_week IS NOT NULL
+            ), 0) AS planned_weekly_usage
           FROM consumable_stock cs
           JOIN products p ON p.id = cs.product_id
         `),
@@ -54,15 +62,32 @@ export async function GET() {
         `),
         client.query(`SELECT status, COUNT(*) AS count FROM machines GROUP BY status`),
         client.query(`SELECT direction, status, COUNT(*) AS count FROM purchase_orders GROUP BY direction, status`),
+        client.query(`
+          SELECT p.id, p.name, p.unit,
+            COALESCE((
+              SELECT SUM(m.tank_capacity * 0.10 * m.fill_frequency_per_week)
+              FROM machines m
+              WHERE m.default_product_id = p.id AND m.status IN ('active', 'needs_service')
+                AND m.tank_capacity IS NOT NULL AND m.fill_frequency_per_week IS NOT NULL
+            ), 0) AS planned_weekly_volume,
+            COALESCE((
+              SELECT SUM(-quantity) FROM consumption_logs
+              WHERE product_id = p.id AND type = 'usage' AND logged_at > NOW() - INTERVAL '7 days'
+            ), 0) AS actual_weekly_volume
+          FROM products p
+        `),
       ])
 
       // Fold stock-flag risk into the leaderboard/at-risk view (same logic as the dashboard's needs-reorder calc).
       const flagsByFacility = {}
       for (const s of stock.rows) {
-        const dailyRate = Number(s.usage_last_60_days) / 60
-        const daysLeft = dailyRate > 0 ? Math.round(Number(s.quantity_on_hand) / dailyRate) : null
-        const flagged = Number(s.quantity_on_hand) < Number(s.reorder_threshold) ||
-          (daysLeft !== null && daysLeft < Number(s.reorder_lead_time_days))
+        const { flagged } = computeStockForecast({
+          quantityOnHand: s.quantity_on_hand,
+          reorderThreshold: s.reorder_threshold,
+          usageLast60Days: s.usage_last_60_days,
+          reorderLeadTimeDays: s.reorder_lead_time_days,
+          plannedWeeklyUsage: s.planned_weekly_usage,
+        })
         if (flagged) flagsByFacility[s.facility_id] = (flagsByFacility[s.facility_id] || 0) + 1
       }
 
@@ -87,6 +112,18 @@ export async function GET() {
         value: Number(pipelineMap[status]?.value || 0),
       }))
 
+      // Planned draw (from installed machines' tank size × fill cadence) vs. what's
+      // actually been logged in the last 7 days — surfaces demand from machines that
+      // haven't built up usage history yet, and flags products drifting from plan.
+      const fleetDemandForecast = fleetDemand.rows
+        .map((p) => ({
+          ...p,
+          planned_weekly_volume: Number(p.planned_weekly_volume),
+          actual_weekly_volume: Number(p.actual_weekly_volume),
+        }))
+        .filter((p) => p.planned_weekly_volume > 0 || p.actual_weekly_volume > 0)
+        .sort((a, b) => b.planned_weekly_volume - a.planned_weekly_volume)
+
       return {
         facility_leaderboard: facilityLeaderboard,
         at_risk_facilities: atRiskFacilities,
@@ -95,6 +132,7 @@ export async function GET() {
         pipeline_by_stage: pipelineOrdered,
         machine_status_breakdown: machineStatus.rows,
         po_status_breakdown: poStatus.rows,
+        fleet_demand_forecast: fleetDemandForecast,
       }
     })
 
