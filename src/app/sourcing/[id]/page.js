@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Pencil, Ship } from 'lucide-react'
 import { SOURCING_STAGES } from '@/lib/constants'
 import { formatStatus } from '@/lib/format'
+import DraftButton from '../../components/DraftButton'
 
 const editableFields = [
   'supplier_name', 'supplier_country', 'quantity', 'order_date', 'deposit_amount', 'deposit_paid_date',
@@ -132,9 +133,12 @@ export default function SourcingOrderDetailPage({ params }) {
             {order.project_title && <> · {order.project_title}</>}
           </p>
         </div>
-        <select className="input" value={order.stage} onChange={(e) => updateStage(e.target.value)} style={{ width: 'auto' }}>
-          {SOURCING_STAGES.map((s) => <option key={s} value={s}>{formatStatus(s)}</option>)}
-        </select>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+          <DraftButton kind="supplier_chase" contextId={id} label="Chase supplier" />
+          <select className="input" value={order.stage} onChange={(e) => updateStage(e.target.value)} style={{ width: 'auto' }}>
+            {SOURCING_STAGES.map((s) => <option key={s} value={s}>{formatStatus(s)}</option>)}
+          </select>
+        </div>
       </div>
 
       {/* Progress stepper */}

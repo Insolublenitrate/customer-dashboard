@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Plus, Star, Wrench, AlertTriangle } from 'lucide-react'
 import { PROJECT_STATUSES, MACHINE_STATUSES } from '@/lib/constants'
 import MetricStrip from '../../components/MetricStrip'
+import DraftButton from '../../components/DraftButton'
 
 const emptyContact = { name: '', title: '', email: '', phone: '', is_primary: false }
 const emptyProject = { title: '', spec_summary: '', status: 'discovery', quote_value: '', target_date: '' }
@@ -170,6 +171,10 @@ export default function FacilityDetailPage({ params }) {
           <p style={{ color: 'var(--muted)' }}>
             {[facility.address, facility.city, facility.state, facility.zip].filter(Boolean).join(', ') || 'No address on file'}
           </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <DraftButton kind="facility_checkin" contextId={id} label="Draft check-in" />
+          <DraftButton kind="reorder_proposal" contextId={id} label="Draft reorder" />
         </div>
       </div>
 

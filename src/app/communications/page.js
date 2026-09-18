@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Upload, FileText, Mail, Phone, File as FileIcon, Download } from 'lucide-react'
 import { COMMUNICATION_TYPES } from '@/lib/constants'
 import MetricStrip from '../components/MetricStrip'
+import DraftButton from '../components/DraftButton'
 
 const TYPE_ICON = {
   meeting_minutes: FileText,
@@ -193,6 +194,7 @@ export default function CommunicationsPage() {
                     </div>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end', flexShrink: 0 }}>
+                    <DraftButton kind="communication_reply" contextId={c.id} label="Reply" />
                     {c.storage_url && (
                       <a href={`/api/communications/${c.id}/file`} className="btn btn-secondary" style={{ padding: '0.4rem 0.6rem' }}>
                         <Download size={14} />

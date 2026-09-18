@@ -284,3 +284,50 @@ export async function answerQuestion({ dbClient, snapshot, history, question }) 
 
   return { answer, model: finalMessage.model }
 }
+
+const DraftSchema = z.object({
+  subject: z.string().describe('Email subject line. Specific, not generic.'),
+  body: z.string().describe('The message body, ready to send. Plain text, no markdown.'),
+  placeholders: z
+    .array(z.string())
+    .describe('Any [SQUARE BRACKET] placeholders left in the body because the fact was not in the context. Empty if none.'),
+})
+
+const DRAFT_INTENT = {
+  facility_checkin: 'a check-in message to this facility — pick up whatever is genuinely live right now (open items, stock, machines, a project in flight) rather than sending an empty "just touching base"',
+  reorder_proposal: 'a message proposing a consumable reorder, justified by what their machines are actually drawing and how long delivery takes',
+  supplier_chase: 'a message to the overseas manufacturer asking where this build has got to, and what the realistic ship and arrival dates now are',
+  communication_reply: 'a reply to the communication below, answering what it raised and confirming any next steps',
+}
+
+const DRAFT_SYSTEM_PROMPT = `You draft messages for the owner of a small company that builds custom, large-volume ultrasonic cleaning machines and supplies the detergent that runs in them. He writes to a long-standing industrial customer and to the overseas manufacturers who build his machines.
+
+His voice: direct, warm without being chummy, concrete. He knows these people. He does not open with "I hope this email finds you well", does not use consultant vocabulary, and does not pad. Short paragraphs. If there is an ask, it is unmistakable and it comes with a date.
+
+The hard rule: every fact in the draft must come from the context you are given. Do not invent prices, dates, delivery windows, quantities, names, or commitments. If the message needs a fact that is not in the context, write it as a [SQUARE BRACKET] placeholder and list it in the placeholders field. A drafted email that invents a delivery date is worse than one with a blank in it.
+
+Do not thank people for things they have not done, reference meetings that are not in the context, or claim to have checked something you have not.`
+
+// Drafts are not stored — they are copied out and edited by hand. `instruction`
+// carries the owner's nudge on a regenerate ("firmer", "shorter", "mention the
+// October visit").
+export async function draftMessage({ kind, context, instruction }) {
+  const intent = DRAFT_INTENT[kind]
+  const nudge = instruction ? `\n\nThe owner asks for this specifically: ${instruction.slice(0, 500)}` : ''
+
+  const response = await client.messages.parse({
+    model: 'claude-opus-5',
+    max_tokens: 4096,
+    system: DRAFT_SYSTEM_PROMPT,
+    thinking: { type: 'adaptive' },
+    messages: [
+      {
+        role: 'user',
+        content: `Draft ${intent}.${nudge}\n\nEverything you know:\n${JSON.stringify(context, null, 2)}`,
+      },
+    ],
+    output_config: { format: zodOutputFormat(DraftSchema) },
+  })
+
+  return response.parsed_output
+}
