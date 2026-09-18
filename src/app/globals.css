@@ -454,42 +454,30 @@ a.glass-card:hover,
 }
 
 /* Filter chips. Distinct from .input-group, which stacks its children on
-   mobile — right for form selects, wrong for a row of filters: nine stage
-   chips became nine full-width buttons and pushed the list off-screen. */
+   mobile — right for form selects, wrong for a row of filters, where nine
+   stage chips became nine full-width buttons. They wrap rather than scroll
+   sideways: off-screen content people have to swipe for goes unfound. */
 .filter-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 1.25rem;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.filter-row::-webkit-scrollbar {
-  display: none;
 }
 
 .filter-row > * {
   flex: 0 0 auto;
 }
 
-/* Per-screen metric strip */
+/* Per-screen metric strip. Wraps onto as many rows as it needs — every tile
+   stays on screen and the page scrolls one direction only. */
 .metric-strip {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 0.5rem;
   margin-bottom: 1.25rem;
-  overflow-x: auto;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-
-.metric-strip::-webkit-scrollbar {
-  display: none;
 }
 
 .metric-strip-item {
-  flex: 1 1 0;
-  min-width: 108px;
   display: flex;
   flex-direction: column;
   gap: 0.2rem;
@@ -503,9 +491,7 @@ a.glass-card:hover,
   font-size: 0.6875rem;
   font-weight: 500;
   color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.25;
 }
 
 .metric-strip-value {
@@ -555,17 +541,9 @@ a.glass-card:hover,
     padding: 1rem;
   }
 
-  /* Strip and filters scroll sideways on a phone instead of stacking. */
-  .metric-strip,
-  .filter-row {
-    margin-left: -1rem;
-    margin-right: -1rem;
-    padding: 0 1rem;
-  }
-
-  .metric-strip-item {
-    flex: 0 0 auto;
-    min-width: 118px;
+  /* Two even columns on a phone; tiles wrap onto more rows as needed. */
+  .metric-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .top-bar-links {
