@@ -5,6 +5,7 @@ import { Upload, FileText, Mail, Phone, File as FileIcon, Download } from 'lucid
 import { COMMUNICATION_TYPES } from '@/lib/constants'
 import MetricStrip from '../components/MetricStrip'
 import DraftButton from '../components/DraftButton'
+import { apiFetch } from '@/lib/apiFetch'
 
 const TYPE_ICON = {
   meeting_minutes: FileText,
@@ -30,8 +31,8 @@ export default function CommunicationsPage() {
 
   const fetchAll = () => {
     Promise.all([
-      fetch('/api/communications').then((r) => r.json()),
-      fetch('/api/facilities').then((r) => r.json()),
+      apiFetch('/api/communications').then((r) => r.json()),
+      apiFetch('/api/facilities').then((r) => r.json()),
     ])
       .then(([commsData, facData]) => {
         setCommunications(commsData.communications || [])
@@ -53,7 +54,7 @@ export default function CommunicationsPage() {
       formData.append('type', selectedType)
       if (selectedFacility) formData.append('facility_id', selectedFacility)
 
-      const res = await fetch('/api/communications/upload', { method: 'POST', body: formData })
+      const res = await apiFetch('/api/communications/upload', { method: 'POST', body: formData })
       if (!res.ok) throw new Error('Upload failed')
       fetchAll()
     } catch (err) {
@@ -74,7 +75,7 @@ export default function CommunicationsPage() {
       formData.append('type', selectedType)
       if (selectedFacility) formData.append('facility_id', selectedFacility)
 
-      const res = await fetch('/api/communications/upload', { method: 'POST', body: formData })
+      const res = await apiFetch('/api/communications/upload', { method: 'POST', body: formData })
       if (!res.ok) throw new Error('Upload failed')
       setPastedText('')
       fetchAll()
@@ -94,7 +95,7 @@ export default function CommunicationsPage() {
   }
 
   const linkFacility = async (commId, facilityId) => {
-    await fetch(`/api/communications/${commId}`, {
+    await apiFetch(`/api/communications/${commId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ facility_id: facilityId }),

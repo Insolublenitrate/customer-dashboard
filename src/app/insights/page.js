@@ -8,6 +8,7 @@ import {
 import { Flame, Trophy, Droplets } from 'lucide-react'
 import { formatCompactCurrency, formatStatus } from '@/lib/format'
 import Briefing from '../components/Briefing'
+import { apiFetch } from '@/lib/apiFetch'
 
 const MACHINE_STATUS_COLOR = {
   active: 'var(--success)',
@@ -67,7 +68,7 @@ export default function InsightsPage() {
   const [sortKey, setSortKey] = useState('total_value')
 
   useEffect(() => {
-    fetch('/api/insights')
+    apiFetch('/api/insights')
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load insights'))))
       .then(setData)
       .catch((err) => console.error('Failed to load insights:', err))
@@ -76,7 +77,7 @@ export default function InsightsPage() {
 
   const sortedLeaderboard = useMemo(() => {
     if (!data) return []
-    return [...data.facility_leaderboard].sort((a, b) => Number(b[sortKey]) - Number(a[sortKey]))
+    return [...(data.facility_leaderboard || [])].sort((a, b) => Number(b[sortKey]) - Number(a[sortKey]))
   }, [data, sortKey])
 
   if (loading) {
@@ -109,11 +110,14 @@ export default function InsightsPage() {
     )
   }
 
+  // Seven aggregates, seven independent queries behind them. Defaulted so a
+  // single missing one costs its own chart and nothing else — this page threw
+  // on the first .map() and rendered blank when any key was absent.
   const {
-    revenue_trend: revenueTrend, pipeline_by_stage: pipelineByStage,
-    machine_status_breakdown: machineStatus, po_status_breakdown: poStatus,
-    at_risk_facilities: atRisk, fleet_demand_forecast: fleetDemand,
-    sourcing_stage_breakdown: sourcingStage,
+    revenue_trend: revenueTrend = [], pipeline_by_stage: pipelineByStage = [],
+    machine_status_breakdown: machineStatus = [], po_status_breakdown: poStatus = [],
+    at_risk_facilities: atRisk = [], fleet_demand_forecast: fleetDemand = [],
+    sourcing_stage_breakdown: sourcingStage = [],
   } = data
 
   const revenueChartData = revenueTrend.map((r) => ({

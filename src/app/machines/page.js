@@ -11,6 +11,7 @@ import { MachineSchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
 import FormError from '../components/FormError'
+import { apiFetch } from '@/lib/apiFetch'
 
 const emptyForm = {
   facility_id: '', machine_model_id: '', sourcing_order_id: '', serial_number: '', model: '', install_date: '', status: 'active',
@@ -50,11 +51,11 @@ export default function MachinesPage() {
     if (facilityFilter) params.set('facility_id', facilityFilter)
 
     Promise.all([
-      fetch(`/api/machines?${params}`).then((r) => (r.ok ? r.json() : { machines: [] })),
-      fetch('/api/facilities').then((r) => (r.ok ? r.json() : { facilities: [] })),
-      fetch('/api/products').then((r) => (r.ok ? r.json() : { products: [] })),
-      fetch('/api/machine-models').then((r) => (r.ok ? r.json() : { machine_models: [] })),
-      fetch('/api/sourcing-orders').then((r) => (r.ok ? r.json() : { sourcing_orders: [] })),
+      apiFetch(`/api/machines?${params}`).then((r) => (r.ok ? r.json() : { machines: [] })),
+      apiFetch('/api/facilities').then((r) => (r.ok ? r.json() : { facilities: [] })),
+      apiFetch('/api/products').then((r) => (r.ok ? r.json() : { products: [] })),
+      apiFetch('/api/machine-models').then((r) => (r.ok ? r.json() : { machine_models: [] })),
+      apiFetch('/api/sourcing-orders').then((r) => (r.ok ? r.json() : { sourcing_orders: [] })),
     ])
       .then(([machinesData, facData, prodData, modelsData, sourcingData]) => {
         setMachines(machinesData.machines || [])

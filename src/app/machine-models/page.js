@@ -9,6 +9,7 @@ import { MachineModelSchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
 import FormError from '../components/FormError'
+import { apiFetch } from '@/lib/apiFetch'
 
 const emptyForm = { name: '', tank_capacity: '', fill_frequency_per_week: '', notes: '' }
 
@@ -22,7 +23,7 @@ export default function MachineModelsPage() {
   })
 
   const fetchMachineModels = () => {
-    fetch('/api/machine-models')
+    apiFetch('/api/machine-models')
       .then((res) => (res.ok ? res.json() : { machine_models: [] }))
       .then((data) => setMachineModels(data.machine_models || []))
       .catch((err) => console.error('Failed to load machine models:', err))

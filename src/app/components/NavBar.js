@@ -91,7 +91,13 @@ export default function NavBar() {
   if (pathname === '/login') return null
 
   const handleSignOut = async () => {
-    await authClient.signOut()
+    // If the session is already dead this throws or no-ops; either way the
+    // destination is the same, so the redirect must not depend on it.
+    try {
+      await authClient.signOut()
+    } catch (err) {
+      console.error('Sign out failed, continuing to login:', err)
+    }
     router.push('/login')
     router.refresh()
   }
@@ -128,14 +134,21 @@ export default function NavBar() {
           ))}
         </nav>
 
-        {session?.user && (
-          <div className="top-bar-user">
-            <span>{session.user.name}</span>
-            <button onClick={handleSignOut} className="btn btn-secondary" style={{ padding: '0.4rem 0.7rem', minHeight: 'auto' }}>
-              <LogOut size={14} />
-            </button>
-          </div>
-        )}
+        {/* Sign out is always rendered, never gated on session?.user. When a
+            session expires server-side, useSession() returns nothing — which is
+            precisely the moment someone needs this button, not the moment to
+            hide it. */}
+        <div className="top-bar-user">
+          {session?.user && <span>{session.user.name}</span>}
+          <button
+            onClick={handleSignOut}
+            className="btn btn-secondary top-bar-signout"
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <LogOut size={16} />
+          </button>
+        </div>
       </header>
 
       <div className={`radial-nav ${isRadialOpen ? 'is-open' : ''}`}>

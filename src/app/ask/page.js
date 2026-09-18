@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Send, Sparkles } from 'lucide-react'
+import { apiFetch } from '@/lib/apiFetch'
 
 const SUGGESTIONS = [
   'Which facility is slipping?',
@@ -30,7 +31,7 @@ export default function AskPage() {
     setPending(true)
 
     try {
-      const res = await fetch('/api/ask', {
+      const res = await apiFetch('/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: trimmed, history }),

@@ -7,6 +7,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { Ship } from 'lucide-react'
 import { formatCompactCurrency } from '@/lib/format'
 import MetricStrip from './components/MetricStrip'
+import { apiFetch } from '@/lib/apiFetch'
 
 const USMap = dynamic(() => import('./components/USMap'), { ssr: false })
 
@@ -25,7 +26,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch('/api/dashboard')
+    apiFetch('/api/dashboard')
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load dashboard'))))
       .then(setData)
       .catch((err) => console.error('Failed to load dashboard:', err))
@@ -48,9 +49,13 @@ export default function Dashboard() {
     )
   }
 
+  // Defaulted, not just destructured: if one aggregate is missing from the
+  // payload the card that uses it goes quiet, rather than the whole dashboard
+  // throwing on .map() and rendering nothing at all.
   const {
-    facilities, stats, overdue_action_items: overdueItems, needs_reorder: needsReorder,
-    overdue_sourcing_orders: overdueSourcing, monthly_revenue: monthlyRevenue,
+    facilities = [], stats = {}, overdue_action_items: overdueItems = [],
+    needs_reorder: needsReorder = [], overdue_sourcing_orders: overdueSourcing = [],
+    monthly_revenue: monthlyRevenue = [],
   } = data
 
   const chartData = monthlyRevenue.map((row) => ({

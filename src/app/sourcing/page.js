@@ -11,6 +11,7 @@ import { SourcingOrderSchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
 import FormError from '../components/FormError'
+import { apiFetch } from '@/lib/apiFetch'
 
 const emptyForm = {
   project_id: '', facility_id: '', machine_model_id: '', supplier_name: '', supplier_country: '',
@@ -52,10 +53,10 @@ export default function SourcingPage() {
     if (stageFilter) params.set('stage', stageFilter)
 
     Promise.all([
-      fetch(`/api/sourcing-orders?${params}`).then((r) => (r.ok ? r.json() : { sourcing_orders: [] })),
-      fetch('/api/facilities').then((r) => (r.ok ? r.json() : { facilities: [] })),
-      fetch('/api/projects').then((r) => (r.ok ? r.json() : { projects: [] })),
-      fetch('/api/machine-models').then((r) => (r.ok ? r.json() : { machine_models: [] })),
+      apiFetch(`/api/sourcing-orders?${params}`).then((r) => (r.ok ? r.json() : { sourcing_orders: [] })),
+      apiFetch('/api/facilities').then((r) => (r.ok ? r.json() : { facilities: [] })),
+      apiFetch('/api/projects').then((r) => (r.ok ? r.json() : { projects: [] })),
+      apiFetch('/api/machine-models').then((r) => (r.ok ? r.json() : { machine_models: [] })),
     ])
       .then(([ordersData, facData, projData, modelsData]) => {
         setOrders(ordersData.sourcing_orders || [])

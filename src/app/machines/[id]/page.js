@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { MACHINE_STATUSES } from '@/lib/constants'
 import { detergentPerFill, theoreticalWeeklyUsage } from '@/lib/consumption'
+import { apiFetch } from '@/lib/apiFetch'
 
 function formatStatus(status) {
   return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
@@ -16,7 +17,7 @@ export default function MachineDetailPage({ params }) {
   const [loading, setLoading] = useState(true)
 
   const fetchData = () => {
-    fetch(`/api/machines/${id}`)
+    apiFetch(`/api/machines/${id}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load machine'))))
       .then(setData)
       .catch((err) => console.error('Failed to load machine:', err))
@@ -29,7 +30,7 @@ export default function MachineDetailPage({ params }) {
   }, [id])
 
   const updateStatus = async (status) => {
-    await fetch(`/api/machines/${id}`, {
+    await apiFetch(`/api/machines/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data.machine, status }),

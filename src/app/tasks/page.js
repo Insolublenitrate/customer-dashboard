@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Calendar, User } from 'lucide-react'
 import MetricStrip from '../components/MetricStrip'
+import { apiFetch } from '@/lib/apiFetch'
 
 export default function TasksPage() {
   const [items, setItems] = useState([])
@@ -14,7 +15,7 @@ export default function TasksPage() {
     const params = new URLSearchParams()
     if (statusFilter) params.set('status', statusFilter)
 
-    fetch(`/api/action-items?${params}`)
+    apiFetch(`/api/action-items?${params}`)
       .then((res) => res.json())
       .then((data) => setItems(data.action_items || []))
       .catch((err) => console.error('Failed to load tasks:', err))
@@ -27,7 +28,7 @@ export default function TasksPage() {
   }, [statusFilter])
 
   const toggleItem = async (item) => {
-    await fetch(`/api/action-items/${item.id}`, {
+    await apiFetch(`/api/action-items/${item.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: item.status === 'open' ? 'done' : 'open' }),

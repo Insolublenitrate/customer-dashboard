@@ -860,3 +860,16 @@ a.glass-card:hover,
   font-size: 0.8125rem;
   margin: 1.25rem 0 0;
 }
+
+/* The escape hatch from a dead session, so it has to be easy to hit — it was
+   the smallest control on the screen at 38x29. */
+.top-bar-signout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  flex-shrink: 0;
+}

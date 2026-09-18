@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { PenLine, X, Copy, Check, RefreshCw, AlertTriangle } from 'lucide-react'
+import { apiFetch } from '@/lib/apiFetch'
 
 // Drop next to whatever the draft is about — the context comes from the
 // record, so the owner never re-types facts the app already holds.
@@ -17,7 +18,7 @@ export default function DraftButton({ kind, contextId, label = 'Draft message' }
     setPending(true)
     setError(null)
     try {
-      const res = await fetch('/api/draft', {
+      const res = await apiFetch('/api/draft', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ kind, context_id: contextId, instruction: nudge || null }),

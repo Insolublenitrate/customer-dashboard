@@ -11,6 +11,7 @@ import { SourcingOrderSchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import DraftButton from '../../components/DraftButton'
 import FormError from '../../components/FormError'
+import { apiFetch } from '@/lib/apiFetch'
 
 const editableFields = [
   'supplier_name', 'supplier_country', 'quantity', 'order_date', 'deposit_amount', 'deposit_paid_date',
@@ -67,7 +68,7 @@ export default function SourcingOrderDetailPage({ params }) {
   })
 
   const fetchData = () => {
-    fetch(`/api/sourcing-orders/${id}`)
+    apiFetch(`/api/sourcing-orders/${id}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load sourcing order'))))
       .then(setData)
       .catch((err) => console.error('Failed to load sourcing order:', err))
@@ -80,7 +81,7 @@ export default function SourcingOrderDetailPage({ params }) {
   }, [id])
 
   const updateStage = async (stage) => {
-    await fetch(`/api/sourcing-orders/${id}`, {
+    await apiFetch(`/api/sourcing-orders/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...data.sourcing_order, stage }),

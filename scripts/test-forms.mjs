@@ -415,6 +415,56 @@ const launch = () => chromium.launch({ executablePath: process.env.CHROMIUM_PATH
   await browser.close()
 }
 
+// ==================== expired session, and the way out =====================
+// proxy.js only checks that a session cookie exists, so a session that expired
+// server-side still gets waved through and every data call answers 401.
+{
+  const browser = await launch()
+
+  for (const route of ['/', '/facilities', '/orders', '/insights', '/tasks']) {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+    await page.route('**/api/**', (r) =>
+      r.request().url().includes('/api/auth/')
+        // better-auth reports no session, which is what makes the nav hide the name.
+        ? r.fulfill({ status: 200, contentType: 'application/json', body: 'null' })
+        : r.fulfill({ status: 401, contentType: 'application/json', body: '{"error":"Unauthorized"}' }))
+
+    await page.goto(B + route, { waitUntil: 'domcontentloaded' })
+    await page.waitForTimeout(2500)
+
+    const url = new URL(page.url())
+    ok(`${route} sends an expired session to login`, url.pathname === '/login', page.url())
+    ok(`${route} remembers where you were going`, url.searchParams.get('from') === route, url.search)
+    await page.close()
+  }
+
+  // The escape hatch has to exist even when the session is the broken thing.
+  {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+    let block401 = false
+    await page.route('**/api/**', (r) => {
+      if (r.request().url().includes('/api/auth/')) {
+        return r.fulfill({ status: 200, contentType: 'application/json', body: 'null' })
+      }
+      // Hang the data calls instead of 401ing, so the page stays put and we can
+      // inspect the chrome a stranded user would actually see.
+      return block401 ? r.abort() : r.fulfill({ status: 200, contentType: 'application/json',
+        body: JSON.stringify({ facilities: [], metrics: [], stats: {}, monthly_revenue: [],
+          overdue_action_items: [], needs_reorder: [], overdue_sourcing_orders: [], open_po_value: {} }) })
+    })
+    block401 = false
+    await page.goto(`${B}/facilities`, { waitUntil: 'domcontentloaded' })
+    await page.waitForTimeout(2500)
+    const signOut = page.locator('button[aria-label="Sign out"]')
+    ok('sign out is rendered with no session at all', await signOut.count() === 1)
+    ok('sign out is visible on a phone', await signOut.isVisible())
+    const box = await signOut.boundingBox()
+    ok('sign out is reachable, not off-screen', box && box.x >= 0 && box.x + box.width <= 390, JSON.stringify(box))
+    await page.close()
+  }
+  await browser.close()
+}
+
 let fail = 0
 for (const r of results) {
   if (!r.pass) fail++

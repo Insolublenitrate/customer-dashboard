@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Sparkles, RefreshCw, TrendingUp, AlertTriangle, Users, DollarSign, HelpCircle } from 'lucide-react'
+import { apiFetch } from '@/lib/apiFetch'
 
 const CATEGORY = {
   sales_opportunity: { label: 'Opportunity', icon: TrendingUp, color: 'var(--success)' },
@@ -21,7 +22,7 @@ export default function Briefing() {
   const [error, setError] = useState(null)
 
   useEffect(() => {
-    fetch('/api/briefing')
+    apiFetch('/api/briefing')
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load briefing'))))
       .then((data) => setBriefing(data.briefing))
       .catch((err) => console.error('Failed to load briefing:', err))
@@ -32,7 +33,7 @@ export default function Briefing() {
     setGenerating(true)
     setError(null)
     try {
-      const res = await fetch('/api/briefing', { method: 'POST' })
+      const res = await apiFetch('/api/briefing', { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to generate briefing')
       setBriefing(data.briefing)

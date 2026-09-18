@@ -9,6 +9,7 @@ import { PurchaseOrderSchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
 import FormError from '../components/FormError'
+import { apiFetch } from '@/lib/apiFetch'
 
 const emptyItem = { product_id: '', description: '', quantity: 1, unit_price: '' }
 const emptyForm = {
@@ -49,9 +50,9 @@ export default function OrdersPage() {
     if (directionFilter) params.set('direction', directionFilter)
 
     Promise.all([
-      fetch(`/api/purchase-orders?${params}`).then((r) => (r.ok ? r.json() : { purchase_orders: [] })),
-      fetch('/api/facilities').then((r) => (r.ok ? r.json() : { facilities: [] })),
-      fetch('/api/products').then((r) => (r.ok ? r.json() : { products: [] })),
+      apiFetch(`/api/purchase-orders?${params}`).then((r) => (r.ok ? r.json() : { purchase_orders: [] })),
+      apiFetch('/api/facilities').then((r) => (r.ok ? r.json() : { facilities: [] })),
+      apiFetch('/api/products').then((r) => (r.ok ? r.json() : { products: [] })),
     ])
       .then(([ordersData, facData, prodData]) => {
         setOrders(ordersData.purchase_orders || [])
@@ -94,7 +95,7 @@ export default function OrdersPage() {
   }
 
   const updateStatus = async (order, status) => {
-    await fetch(`/api/purchase-orders/${order.id}`, {
+    await apiFetch(`/api/purchase-orders/${order.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...order, status }),

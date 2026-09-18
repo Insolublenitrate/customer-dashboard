@@ -11,6 +11,7 @@ import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../../components/MetricStrip'
 import DraftButton from '../../components/DraftButton'
 import FormError from '../../components/FormError'
+import { apiFetch } from '@/lib/apiFetch'
 
 const emptyContact = { name: '', title: '', email: '', phone: '', is_primary: false }
 const emptyProject = { title: '', spec_summary: '', status: 'discovery', quote_value: '', target_date: '' }
@@ -42,11 +43,11 @@ export default function FacilityDetailPage({ params }) {
 
   const fetchData = () => {
     Promise.all([
-      fetch(`/api/facilities/${id}`).then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load facility')))),
-      fetch(`/api/facilities/${id}/stock`).then((res) => (res.ok ? res.json() : { stock: [], consumption_logs: [] })),
-      fetch(`/api/machines?facility_id=${id}`).then((res) => (res.ok ? res.json() : { machines: [] })),
-      fetch('/api/products').then((res) => (res.ok ? res.json() : { products: [] })),
-      fetch('/api/machine-models').then((res) => (res.ok ? res.json() : { machine_models: [] })),
+      apiFetch(`/api/facilities/${id}`).then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load facility')))),
+      apiFetch(`/api/facilities/${id}/stock`).then((res) => (res.ok ? res.json() : { stock: [], consumption_logs: [] })),
+      apiFetch(`/api/machines?facility_id=${id}`).then((res) => (res.ok ? res.json() : { machines: [] })),
+      apiFetch('/api/products').then((res) => (res.ok ? res.json() : { products: [] })),
+      apiFetch('/api/machine-models').then((res) => (res.ok ? res.json() : { machine_models: [] })),
     ])
       .then(([facilityData, stock, machinesData, productsData, machineModelsData]) => {
         setData(facilityData)
@@ -117,16 +118,16 @@ export default function FacilityDetailPage({ params }) {
   })
 
   const updateProjectStatus = async (projectId, status) => {
-    await fetch(`/api/projects/${projectId}`, {
+    await apiFetch(`/api/projects/${projectId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...data.projects.find((p) => p.id === projectId), status }),
+      body: JSON.stringify({ ...(data.projects || []).find((p) => p.id === projectId), status }),
     })
     fetchData()
   }
 
   const toggleActionItem = async (item) => {
-    await fetch(`/api/action-items/${item.id}`, {
+    await apiFetch(`/api/action-items/${item.id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: item.status === 'open' ? 'done' : 'open' }),

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { formatCompactCurrency } from '@/lib/format'
+import { apiFetch } from '@/lib/apiFetch'
 
 const TONE_COLOR = {
   danger: 'var(--danger)',
@@ -30,7 +31,7 @@ export default function MetricStrip({ screen, facilityId, metrics: provided }) {
     if (facilityId) params.set('facility_id', facilityId)
 
     let cancelled = false
-    fetch(`/api/screen-metrics?${params}`)
+    apiFetch(`/api/screen-metrics?${params}`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load metrics'))))
       .then((data) => {
         if (!cancelled) setFetched(data.metrics || [])

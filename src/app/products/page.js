@@ -8,6 +8,7 @@ import { ProductSchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
 import FormError from '../components/FormError'
+import { apiFetch } from '@/lib/apiFetch'
 
 const emptyForm = { name: '', sku: '', unit: 'gallon', unit_price: '', supplier_name: '', reorder_lead_time_days: 14 }
 
@@ -21,7 +22,7 @@ export default function ProductsPage() {
   })
 
   const fetchProducts = () => {
-    fetch('/api/products')
+    apiFetch('/api/products')
       .then((res) => (res.ok ? res.json() : { products: [] }))
       .then((data) => setProducts(data.products || []))
       .catch((err) => console.error('Failed to load products:', err))

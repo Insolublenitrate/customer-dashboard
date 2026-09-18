@@ -9,6 +9,7 @@ import { FacilitySchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
 import FormError from '../components/FormError'
+import { apiFetch } from '@/lib/apiFetch'
 
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA',
@@ -31,7 +32,7 @@ export default function FacilitiesPage() {
   })
 
   const fetchFacilities = () => {
-    fetch('/api/facilities')
+    apiFetch('/api/facilities')
       .then((res) => res.json())
       .then((data) => setFacilities(data.facilities || []))
       .catch((err) => console.error('Failed to load facilities:', err))
