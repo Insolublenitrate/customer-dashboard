@@ -7,7 +7,7 @@ import { MACHINE_STATUSES } from '@/lib/constants'
 import { detergentPerFill } from '@/lib/consumption'
 
 const emptyForm = {
-  facility_id: '', machine_model_id: '', serial_number: '', model: '', install_date: '', status: 'active',
+  facility_id: '', machine_model_id: '', sourcing_order_id: '', serial_number: '', model: '', install_date: '', status: 'active',
   default_product_id: '', tank_capacity: '', fill_frequency_per_week: '', notes: '',
 }
 
@@ -27,6 +27,7 @@ export default function MachinesPage() {
   const [facilities, setFacilities] = useState([])
   const [products, setProducts] = useState([])
   const [machineModels, setMachineModels] = useState([])
+  const [sourcingOrders, setSourcingOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [facilityFilter, setFacilityFilter] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -42,12 +43,14 @@ export default function MachinesPage() {
       fetch('/api/facilities').then((r) => (r.ok ? r.json() : { facilities: [] })),
       fetch('/api/products').then((r) => (r.ok ? r.json() : { products: [] })),
       fetch('/api/machine-models').then((r) => (r.ok ? r.json() : { machine_models: [] })),
+      fetch('/api/sourcing-orders').then((r) => (r.ok ? r.json() : { sourcing_orders: [] })),
     ])
-      .then(([machinesData, facData, prodData, modelsData]) => {
+      .then(([machinesData, facData, prodData, modelsData, sourcingData]) => {
         setMachines(machinesData.machines || [])
         setFacilities(facData.facilities || [])
         setProducts(prodData.products || [])
         setMachineModels(modelsData.machine_models || [])
+        setSourcingOrders(sourcingData.sourcing_orders || [])
       })
       .catch((err) => console.error('Failed to load machines:', err))
       .finally(() => setLoading(false))
@@ -161,6 +164,12 @@ export default function MachinesPage() {
                 <select className="input" value={form.machine_model_id} onChange={(e) => applyMachineModel(e.target.value)}>
                   <option value="">Machine model (optional, prefills size)…</option>
                   {machineModels.map((m) => <option key={m.id} value={m.id}>{m.name} — {Number(m.tank_capacity).toLocaleString()} gal</option>)}
+                </select>
+              )}
+              {sourcingOrders.length > 0 && (
+                <select className="input" value={form.sourcing_order_id} onChange={(e) => setForm({ ...form, sourcing_order_id: e.target.value })}>
+                  <option value="">Sourced from order (optional)…</option>
+                  {sourcingOrders.map((o) => <option key={o.id} value={o.id}>{o.supplier_name} — {o.machine_model_name || 'build'}</option>)}
                 </select>
               )}
               <input className="input" placeholder="Model / designation" value={form.model}

@@ -3,6 +3,27 @@ import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
 import { PROJECT_STATUSES } from '@/lib/constants'
 
+export async function GET() {
+  const { unauthorized } = await requireSession()
+  if (unauthorized) return unauthorized
+
+  try {
+    const rows = await withClient(async (client) => {
+      const result = await client.query(`
+        SELECT p.*, f.name AS facility_name
+        FROM projects p
+        JOIN facilities f ON f.id = p.facility_id
+        ORDER BY p.created_at DESC
+      `)
+      return result.rows
+    })
+    return NextResponse.json({ projects: rows })
+  } catch (error) {
+    console.error('Failed to list projects:', error)
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  }
+}
+
 export async function POST(request) {
   const { unauthorized } = await requireSession()
   if (unauthorized) return unauthorized

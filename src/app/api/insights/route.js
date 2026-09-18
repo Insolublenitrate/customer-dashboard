@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
-import { PROJECT_STATUSES } from '@/lib/constants'
+import { PROJECT_STATUSES, SOURCING_STAGES } from '@/lib/constants'
 import { computeStockForecast } from '@/lib/consumption'
 
 export async function GET() {
@@ -10,7 +10,7 @@ export async function GET() {
 
   try {
     const data = await withClient(async (client) => {
-      const [leaderboard, stock, deltas, revenueTrend, pipelineByStage, machineStatus, poStatus, fleetDemand] = await Promise.all([
+      const [leaderboard, stock, deltas, revenueTrend, pipelineByStage, machineStatus, poStatus, fleetDemand, sourcingStage, arrivingSoon] = await Promise.all([
         client.query(`
           SELECT
             f.id, f.name, f.is_mother_location,
@@ -76,6 +76,17 @@ export async function GET() {
             ), 0) AS actual_weekly_volume
           FROM products p
         `),
+        client.query(`SELECT stage, COUNT(*) AS count FROM machine_sourcing_orders GROUP BY stage`),
+        client.query(`
+          SELECT so.*, f.name AS facility_name
+          FROM machine_sourcing_orders so
+          LEFT JOIN facilities f ON f.id = so.facility_id
+          WHERE so.stage NOT IN ('arrived', 'installed')
+            AND so.expected_arrival_date IS NOT NULL AND so.expected_arrival_date >= CURRENT_DATE
+            AND so.expected_arrival_date < CURRENT_DATE + INTERVAL '21 days'
+          ORDER BY so.expected_arrival_date ASC
+          LIMIT 8
+        `),
       ])
 
       // Fold stock-flag risk into the leaderboard/at-risk view (same logic as the dashboard's needs-reorder calc).
@@ -124,6 +135,9 @@ export async function GET() {
         .filter((p) => p.planned_weekly_volume > 0 || p.actual_weekly_volume > 0)
         .sort((a, b) => b.planned_weekly_volume - a.planned_weekly_volume)
 
+      const sourcingMap = Object.fromEntries(sourcingStage.rows.map((r) => [r.stage, Number(r.count)]))
+      const sourcingStageOrdered = SOURCING_STAGES.map((stage) => ({ stage, count: sourcingMap[stage] || 0 }))
+
       return {
         facility_leaderboard: facilityLeaderboard,
         at_risk_facilities: atRiskFacilities,
@@ -133,6 +147,8 @@ export async function GET() {
         machine_status_breakdown: machineStatus.rows,
         po_status_breakdown: poStatus.rows,
         fleet_demand_forecast: fleetDemandForecast,
+        sourcing_stage_breakdown: sourcingStageOrdered,
+        arriving_soon: arrivingSoon.rows,
       }
     })
 

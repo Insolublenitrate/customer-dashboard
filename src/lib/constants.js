@@ -21,3 +21,14 @@ export const CONSUMPTION_LOG_TYPES = ['usage', 'delivery', 'adjustment']
 export const PO_DIRECTIONS = ['incoming', 'outgoing']
 
 export const PO_STATUSES = ['draft', 'submitted', 'confirmed', 'shipped', 'fulfilled', 'cancelled']
+
+export const SOURCING_STAGES = [
+  'order_placed',
+  'in_production',
+  'quality_check',
+  'shipped',
+  'in_transit',
+  'customs',
+  'arrived',
+  'installed',
+]

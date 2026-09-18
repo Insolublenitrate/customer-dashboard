@@ -9,7 +9,7 @@ export async function GET() {
 
   try {
     const data = await withClient(async (client) => {
-      const [facilities, stats, overdue, stock, revenue] = await Promise.all([
+      const [facilities, stats, overdue, stock, revenue, overdueSourcing] = await Promise.all([
         client.query('SELECT id, name, state, is_mother_location FROM facilities'),
         client.query(`
           SELECT
@@ -54,6 +54,15 @@ export async function GET() {
           GROUP BY 1
           ORDER BY 1 ASC
         `),
+        client.query(`
+          SELECT so.*, f.name AS facility_name
+          FROM machine_sourcing_orders so
+          LEFT JOIN facilities f ON f.id = so.facility_id
+          WHERE so.stage NOT IN ('arrived', 'installed')
+            AND so.expected_arrival_date IS NOT NULL AND so.expected_arrival_date < CURRENT_DATE
+          ORDER BY so.expected_arrival_date ASC
+          LIMIT 10
+        `),
       ])
 
       const needsReorder = stock.rows
@@ -74,6 +83,7 @@ export async function GET() {
         stats: stats.rows[0],
         overdue_action_items: overdue.rows,
         needs_reorder: needsReorder,
+        overdue_sourcing_orders: overdueSourcing.rows,
         monthly_revenue: revenue.rows,
       }
     })

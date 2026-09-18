@@ -5,8 +5,14 @@ import Link from 'next/link'
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts'
-import { TrendingUp, TrendingDown, Minus, Flame, Trophy, Droplets } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Flame, Trophy, Droplets, Ship } from 'lucide-react'
 import { formatCompactCurrency, formatStatus, periodDelta } from '@/lib/format'
+
+function daysUntil(dateStr) {
+  if (!dateStr) return null
+  const diffMs = new Date(dateStr).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)
+  return Math.round(diffMs / 86400000)
+}
 
 const MACHINE_STATUS_COLOR = {
   active: 'var(--success)',
@@ -111,6 +117,7 @@ export default function InsightsPage() {
     deltas, revenue_trend: revenueTrend, pipeline_by_stage: pipelineByStage,
     machine_status_breakdown: machineStatus, po_status_breakdown: poStatus,
     at_risk_facilities: atRisk, fleet_demand_forecast: fleetDemand,
+    sourcing_stage_breakdown: sourcingStage, arriving_soon: arrivingSoon,
   } = data
 
   const revenueChartData = revenueTrend.map((r) => ({
@@ -123,6 +130,8 @@ export default function InsightsPage() {
   const demandChartData = (fleetDemand || []).map((p) => ({
     name: p.name, unit: p.unit, planned: p.planned_weekly_volume, actual: p.actual_weekly_volume,
   }))
+
+  const sourcingChartData = (sourcingStage || []).filter((s) => s.count > 0).map((s) => ({ stage: formatStatus(s.stage), count: s.count }))
 
   const machineStatusData = machineStatus.map((m) => ({ status: m.status, label: formatStatus(m.status), count: Number(m.count) }))
   const poStatusTotals = {}
@@ -297,6 +306,54 @@ export default function InsightsPage() {
           <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: 8 }}>
             A big gap means usage isn&apos;t being logged as often as machines are actually running — or a facility is under-ordering against its fleet size.
           </p>
+        </div>
+      )}
+
+      {(arrivingSoon?.length > 0 || sourcingChartData.length > 0) && (
+        <div className="grid-responsive-2" style={{ marginTop: '1rem' }}>
+          <div className="glass glass-card">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: '1rem' }}>
+              <Ship size={16} color="var(--primary-hover)" />
+              <h3 style={{ margin: 0 }}>Arriving soon</h3>
+            </div>
+            {!arrivingSoon || arrivingSoon.length === 0 ? (
+              <p className="text-muted">Nothing due in the next 3 weeks.</p>
+            ) : (
+              <div className="row-list">
+                {arrivingSoon.map((o) => {
+                  const eta = daysUntil(o.expected_arrival_date)
+                  return (
+                    <Link key={o.id} href={`/sourcing/${o.id}`} className="row-card" style={{ textDecoration: 'none', color: 'inherit', border: '1px solid var(--border)', borderRadius: 'var(--radius-md)' }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <strong>{o.supplier_name}</strong>
+                        <div className="text-muted" style={{ fontSize: '0.8125rem', display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 2 }}>
+                          {o.facility_name && <span>{o.facility_name}</span>}
+                          <span>{eta === 0 ? 'ETA today' : `ETA in ${eta} day${eta === 1 ? '' : 's'}`}</span>
+                        </div>
+                      </div>
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="glass glass-card">
+            <h3>Sourcing pipeline</h3>
+            {sourcingChartData.length === 0 ? <p className="text-muted">No sourcing orders yet.</p> : (
+              <div style={{ width: '100%', height: Math.max(140, sourcingChartData.length * 28) }}>
+                <ResponsiveContainer>
+                  <BarChart data={sourcingChartData} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 0 }} barSize={14}>
+                    <CartesianGrid horizontal={false} stroke="var(--border)" />
+                    <XAxis type="number" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                    <YAxis type="category" dataKey="stage" tick={{ fill: 'var(--muted)', fontSize: 11 }} axisLine={false} tickLine={false} width={90} />
+                    <Tooltip content={<ChartTooltip />} cursor={{ fill: 'var(--surface-hover)' }} />
+                    <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
         </div>
       )}
 

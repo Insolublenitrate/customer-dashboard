@@ -211,6 +211,52 @@ async function migrate() {
     );
   `)
 
+  console.log('Creating machine_sourcing_orders...')
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS machine_sourcing_orders (
+      id SERIAL PRIMARY KEY,
+      project_id INTEGER REFERENCES projects(id) ON DELETE SET NULL,
+      facility_id INTEGER REFERENCES facilities(id) ON DELETE SET NULL,
+      machine_model_id INTEGER REFERENCES machine_models(id) ON DELETE SET NULL,
+      supplier_name TEXT NOT NULL,
+      supplier_country TEXT,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      stage TEXT NOT NULL DEFAULT 'order_placed',
+      order_date DATE,
+      deposit_amount NUMERIC,
+      deposit_paid_date DATE,
+      total_cost NUMERIC,
+      expected_ship_date DATE,
+      actual_ship_date DATE,
+      expected_arrival_date DATE,
+      actual_arrival_date DATE,
+      container_number TEXT,
+      vessel_name TEXT,
+      carrier TEXT,
+      port_of_origin TEXT,
+      port_of_destination TEXT,
+      tracking_url TEXT,
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  console.log('Creating sourcing_order_events...')
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS sourcing_order_events (
+      id SERIAL PRIMARY KEY,
+      sourcing_order_id INTEGER NOT NULL REFERENCES machine_sourcing_orders(id) ON DELETE CASCADE,
+      stage TEXT NOT NULL,
+      occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      notes TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
+  // Links an installed machine back to the sourcing order that brought it in.
+  await client.query(`ALTER TABLE machines ADD COLUMN IF NOT EXISTS sourcing_order_id INTEGER REFERENCES machine_sourcing_orders(id) ON DELETE SET NULL;`)
+
   console.log('Domain schema migration complete.')
   client.release()
   process.exit(0)

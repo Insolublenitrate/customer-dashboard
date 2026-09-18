@@ -99,6 +99,14 @@ export default function MachineDetailPage({ params }) {
             {machine.project_title && (
               <div><span className="text-muted">Built from project: </span>{machine.project_title}</div>
             )}
+            {machine.sourcing_order_id && (
+              <div>
+                <span className="text-muted">Sourced via: </span>
+                <Link href={`/sourcing/${machine.sourcing_order_id}`} style={{ color: 'var(--primary-hover)' }}>
+                  {machine.sourcing_supplier_name || `Order #${machine.sourcing_order_id}`}
+                </Link>
+              </div>
+            )}
             {machine.notes && (
               <div style={{ marginTop: 8 }}>
                 <span className="text-muted">Notes</span>

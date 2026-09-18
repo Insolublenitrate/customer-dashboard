@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import { Building2, ClipboardList, MessageSquare, AlertTriangle, DollarSign, PackageSearch } from 'lucide-react'
+import { Building2, ClipboardList, MessageSquare, AlertTriangle, DollarSign, PackageSearch, Ship } from 'lucide-react'
 import { formatCompactCurrency } from '@/lib/format'
 
 const USMap = dynamic(() => import('./components/USMap'), { ssr: false })
@@ -47,14 +47,17 @@ export default function Dashboard() {
     )
   }
 
-  const { facilities, stats, overdue_action_items: overdueItems, needs_reorder: needsReorder, monthly_revenue: monthlyRevenue } = data
+  const {
+    facilities, stats, overdue_action_items: overdueItems, needs_reorder: needsReorder,
+    overdue_sourcing_orders: overdueSourcing, monthly_revenue: monthlyRevenue,
+  } = data
 
   const chartData = monthlyRevenue.map((row) => ({
     month: new Date(row.month).toLocaleDateString('en-US', { month: 'short' }),
     revenue: Number(row.revenue),
   }))
 
-  const attentionCount = overdueItems.length + needsReorder.length
+  const attentionCount = overdueItems.length + needsReorder.length + overdueSourcing.length
 
   return (
     <main className="container">
@@ -147,6 +150,18 @@ export default function Dashboard() {
                   <div>{s.product_name} running low at {s.facility_name}</div>
                   <div style={{ color: 'var(--warning)', fontSize: '0.75rem' }}>
                     {s.quantity_on_hand} {s.unit} on hand{s.days_left !== null ? ` · ~${s.days_left} days left` : ''}
+                  </div>
+                </Link>
+              ))}
+              {overdueSourcing.map((o) => (
+                <Link
+                  key={`sourcing-${o.id}`}
+                  href={`/sourcing/${o.id}`}
+                  style={{ textDecoration: 'none', color: 'inherit', borderBottom: '1px solid var(--border)', paddingBottom: 8, display: 'block' }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Ship size={13} /> {o.supplier_name} order past its ETA</div>
+                  <div style={{ color: 'var(--danger)', fontSize: '0.75rem' }}>
+                    {o.facility_name ? `${o.facility_name} · ` : ''}expected {new Date(o.expected_arrival_date).toLocaleDateString()}
                   </div>
                 </Link>
               ))}

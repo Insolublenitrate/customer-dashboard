@@ -50,13 +50,14 @@ export async function POST(request) {
 
     const machine = await withClient(async (client) => {
       const result = await client.query(
-        `INSERT INTO machines (facility_id, project_id, machine_model_id, serial_number, model, install_date, status, default_product_id, tank_capacity, fill_frequency_per_week, notes)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `INSERT INTO machines (facility_id, project_id, machine_model_id, sourcing_order_id, serial_number, model, install_date, status, default_product_id, tank_capacity, fill_frequency_per_week, notes)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          RETURNING *`,
         [
           body.facility_id,
           body.project_id || null,
           body.machine_model_id || null,
+          body.sourcing_order_id || null,
           body.serial_number || null,
           body.model || null,
           body.install_date || null,
