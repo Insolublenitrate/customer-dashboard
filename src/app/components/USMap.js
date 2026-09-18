@@ -52,7 +52,7 @@ const USMap = ({ facilities }) => {
             <Marker key={facility.id} coordinates={coords}>
               <circle
                 r={facility.is_mother_location ? 9 : 6}
-                fill={facility.is_mother_location ? "#6366f1" : "#22d3ee"}
+                fill={facility.is_mother_location ? "#f97316" : "#22d3ee"}
                 opacity={0.9}
                 stroke="#08090c"
                 strokeWidth={1.5}

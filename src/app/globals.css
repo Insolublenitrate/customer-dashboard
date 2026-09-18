@@ -5,9 +5,9 @@
   --muted: #8b8f9a;
   --muted-faint: #5c616c;
 
-  --primary: #6366f1;
-  --primary-hover: #818cf8;
-  --primary-soft: rgba(99, 102, 241, 0.14);
+  --primary: #f97316;
+  --primary-hover: #fb923c;
+  --primary-soft: rgba(249, 115, 22, 0.14);
   --accent: #22d3ee;
 
   --success: #34d399;
@@ -18,7 +18,7 @@
   --surface-hover: rgba(255, 255, 255, 0.06);
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.14);
-  --ring: rgba(99, 102, 241, 0.45);
+  --ring: rgba(249, 115, 22, 0.45);
 
   --radius-sm: 0.5rem;
   --radius-md: 0.75rem;
@@ -48,7 +48,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   background-image:
-    radial-gradient(at 15% 0%, rgba(99, 102, 241, 0.07) 0px, transparent 55%),
+    radial-gradient(at 15% 0%, rgba(249, 115, 22, 0.07) 0px, transparent 55%),
     radial-gradient(at 85% 8%, rgba(34, 211, 238, 0.05) 0px, transparent 50%);
   background-attachment: fixed;
   min-height: 100vh;
@@ -250,7 +250,7 @@ a.glass-card:hover,
   font-weight: 600;
   background: var(--primary-soft);
   color: var(--primary-hover);
-  border: 1px solid rgba(99, 102, 241, 0.25);
+  border: 1px solid rgba(249, 115, 22, 0.25);
   white-space: nowrap;
 }
 
