@@ -1,8 +1,13 @@
 'use client'
 
 import { Suspense, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { Eye, EyeOff } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
+import { LoginSchema } from '@/lib/schemas'
+import FormError from '../components/FormError'
 
 export default function LoginPage() {
   return (
@@ -15,65 +20,92 @@ export default function LoginPage() {
 function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setError('')
-    setIsSubmitting(true)
+  const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(LoginSchema),
+    defaultValues: { email: '', password: '' },
+  })
 
-    const { error: signInError } = await authClient.signIn.email({ email, password })
-
-    setIsSubmitting(false)
-
-    if (signInError) {
-      setError(signInError.message || 'Could not sign in with those credentials.')
+  const onSubmit = async ({ email, password }) => {
+    const { error } = await authClient.signIn.email({ email, password })
+    if (error) {
+      // Deliberately not "no such user" vs "wrong password" — that difference
+      // tells an attacker which addresses have accounts.
+      setError('root', { message: error.message || 'Those credentials did not work. Check them and try again.' })
       return
     }
-
     router.push(searchParams.get('from') || '/')
     router.refresh()
   }
 
   return (
-    <main style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem' }}>
-      <form onSubmit={handleSubmit} className="glass glass-card" style={{ width: '100%', maxWidth: 380 }}>
-        <h1 style={{ fontSize: '1.5rem', marginBottom: '1.5rem' }}>Sign in</h1>
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <input
-            className="input"
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            autoComplete="email"
-            required
-            style={{ width: '100%' }}
-          />
-          <input
-            className="input"
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="current-password"
-            required
-            style={{ width: '100%' }}
-          />
-
-          {error && (
-            <p style={{ color: 'var(--danger)', fontSize: '0.875rem' }}>{error}</p>
-          )}
-
-          <button type="submit" className="btn" disabled={isSubmitting} style={{ width: '100%' }}>
-            {isSubmitting ? 'Signing in…' : 'Sign in'}
-          </button>
+    <main className="login-shell">
+      <div className="login-panel">
+        <div className="login-brand">
+          <span className="login-brand-mark" />
+          Account Dashboard
         </div>
-      </form>
+
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="glass glass-card login-card">
+          <h1 className="login-title">Sign in</h1>
+          <p className="login-subtitle">Facilities, machines, stock and sourcing in one place.</p>
+
+          <div className="login-fields">
+            <div className="field">
+              <label className="login-label" htmlFor="email">Email</label>
+              <input
+                id="email"
+                className={`input ${errors.email ? 'input-invalid' : ''}`}
+                type="email"
+                autoComplete="email"
+                autoFocus
+                {...register('email')}
+              />
+              <FormError error={errors.email} />
+            </div>
+
+            <div className="field">
+              <label className="login-label" htmlFor="password">Password</label>
+              {/* The toggle sits inside the field box so the input keeps its
+                  full width and the 44px tap target is not squeezed. */}
+              <div className="login-password">
+                <input
+                  id="password"
+                  className={`input ${errors.password ? 'input-invalid' : ''}`}
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  {...register('password')}
+                />
+                <button
+                  type="button"
+                  className="login-password-toggle"
+                  onClick={() => setShowPassword((v) => !v)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              <FormError error={errors.password} />
+            </div>
+
+            {errors.root && (
+              <div className="login-alert" role="alert">
+                {errors.root.message}
+              </div>
+            )}
+
+            <button type="submit" className="btn login-submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Signing in…' : 'Sign in'}
+            </button>
+          </div>
+        </form>
+
+        {/* There is no sign-up link because there is no sign-up: accounts are
+            made with scripts/createUser.mjs. Saying so beats a dead link. */}
+        <p className="login-footnote">Accounts are set up by your administrator.</p>
+      </div>
     </main>
   )
 }

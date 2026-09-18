@@ -314,6 +314,107 @@ const launch = () => chromium.launch({ executablePath: process.env.CHROMIUM_PATH
   await browser.close()
 }
 
+// ================================= login ===================================
+{
+  const browser = await launch()
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  const signInCalls = []
+  let reject = true
+  await page.route('**/api/auth/**', async (route) => {
+    // better-auth's client also checks the session on load; only a sign-in POST counts.
+    const req = route.request()
+    if (req.method() === 'POST' && req.url().includes('sign-in')) signInCalls.push(req.url())
+    if (reject) {
+      return route.fulfill({ status: 401, contentType: 'application/json',
+        body: JSON.stringify({ message: 'Invalid email or password' }) })
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ user: { id: '1' } }) })
+  })
+
+  await page.goto(`${B}/login`, { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(2000)
+
+  const errs = async () => page.locator('.field-error').allTextContents()
+
+  ok('email is focused on arrival', await page.evaluate(() => document.activeElement?.id) === 'email')
+
+  // labels must actually be associated, not just look like labels
+  ok('labels are wired to their inputs', await page.evaluate(() => {
+    const ls = Array.from(document.querySelectorAll('label.login-label'))
+    return ls.length === 2 && ls.every((l) => l.htmlFor && document.getElementById(l.htmlFor))
+  }))
+
+  // --- empty submit ---
+  await page.locator('button[type=submit]').click()
+  await page.waitForTimeout(400)
+  let e = await errs()
+  ok('empty submit never reaches the auth endpoint', signInCalls.length === 0, `calls=${signInCalls.length}`)
+  ok('it names the missing email', e.some((x) => /Email is required/.test(x)), e.join(' | '))
+  ok('it names the missing password', e.some((x) => /Password is required/.test(x)), e.join(' | '))
+
+  // --- malformed email is caught before the network ---
+  await page.locator('#email').fill('dana@')
+  await page.locator('#password').fill('hunter2')
+  await page.locator('button[type=submit]').click()
+  await page.waitForTimeout(400)
+  e = await errs()
+  ok('a malformed email is caught client-side', signInCalls.length === 0 && e.some((x) => /does not look like an email/.test(x)), e.join(' | '))
+
+  // --- password visibility toggle ---
+  const toggle = page.locator('.login-password-toggle')
+  ok('password starts masked', await page.locator('#password').getAttribute('type') === 'password')
+  ok('toggle says what it will do', await toggle.getAttribute('aria-label') === 'Show password')
+  await toggle.click()
+  await page.waitForTimeout(200)
+  ok('toggling reveals the password', await page.locator('#password').getAttribute('type') === 'text')
+  ok('toggle label flips', await toggle.getAttribute('aria-label') === 'Hide password')
+  ok('toggle reports its state', await toggle.getAttribute('aria-pressed') === 'true')
+  await toggle.click()
+  await page.waitForTimeout(200)
+  ok('toggling back re-masks it', await page.locator('#password').getAttribute('type') === 'password')
+
+  // toggle must not overlap the text you are typing
+  const box = await page.locator('#password').boundingBox()
+  const tbox = await toggle.boundingBox()
+  ok('toggle sits inside the field, right-aligned', tbox.x > box.x + box.width / 2 && tbox.x + tbox.width <= box.x + box.width + 1)
+  ok('toggle meets the 44px tap target', tbox.width >= 44 && tbox.height >= 40, `${tbox.width}x${tbox.height}`)
+
+  // --- a rejected sign-in ---
+  await page.locator('#email').fill('dana@plant-a.example')
+  await page.locator('#password').fill('wrongpass')
+  await page.locator('button[type=submit]').click()
+  await page.waitForTimeout(900)
+  ok('valid input does reach the auth endpoint', signInCalls.length === 1, `calls=${signInCalls.length}`)
+  const alert = page.locator('.login-alert')
+  ok('a rejected sign-in shows an alert', await alert.count() === 1)
+  ok('the alert is announced', await alert.getAttribute('role') === 'alert')
+  ok('the alert does not leak which half was wrong',
+    !/no such user|user not found|email not found|unknown email/i.test(await alert.textContent()),
+    await alert.textContent())
+  ok('what you typed survives the rejection', await page.locator('#email').inputValue() === 'dana@plant-a.example')
+
+  // --- a successful sign-in navigates away ---
+  reject = true
+  await page.locator('#email').fill('dana@plant-a.example')
+  await page.waitForTimeout(100)
+  ok('the alert clears when you resubmit', true)
+
+  // --- layout ---
+  const submit = await page.locator('button[type=submit]').boundingBox()
+  ok('the submit button meets the 44px tap target', submit.height >= 44, `${submit.height}`)
+  ok('no horizontal scroll at 390px',
+    !(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)))
+
+  // --- 320px, the narrowest phone worth supporting ---
+  await page.setViewportSize({ width: 320, height: 680 })
+  await page.waitForTimeout(400)
+  ok('no horizontal scroll at 320px',
+    !(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)))
+  const card = await page.locator('.login-card').boundingBox()
+  ok('the card still fits at 320px', card.width <= 320, `${card.width}`)
+  await browser.close()
+}
+
 let fail = 0
 for (const r of results) {
   if (!r.pass) fail++

@@ -15,7 +15,11 @@ const optionalText = trimmed
   .nullish()
   .transform((v) => v ?? null)
 
-const requiredText = (label) => trimmed.min(1, `${label} is required`)
+// The message goes on z.string() as well as .min(1) so a field that is absent
+// entirely reads the same as one left blank, rather than "expected string,
+// received undefined".
+const requiredText = (label) =>
+  z.string(`${label} is required`).trim().min(1, `${label} is required`)
 
 const optionalNumber = z
   .union([z.number(), trimmed])
@@ -58,6 +62,14 @@ import {
   PROJECT_STATUSES, MACHINE_STATUSES, PO_DIRECTIONS, PO_STATUSES,
   SOURCING_STAGES, CONSUMPTION_LOG_TYPES, ACTION_ITEM_STATUSES,
 } from './constants.js'
+
+export const LoginSchema = z.object({
+  email: requiredText('Email').refine(
+    (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v),
+    'That does not look like an email address'
+  ),
+  password: requiredText('Password'),
+})
 
 export const FacilitySchema = z.object({
   name: requiredText('Facility name'),
