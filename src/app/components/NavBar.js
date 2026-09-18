@@ -5,13 +5,14 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, TrendingUp, Building2, PackageSearch, ClipboardList, MoreHorizontal,
-  Ship, Wrench, Boxes, MessageSquare, Package, Menu, X, LogOut,
+  Ship, Wrench, Boxes, MessageSquare, Package, Menu, X, LogOut, Sparkles,
 } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 
 const LINKS = [
   { href: '/', label: 'Overview', icon: LayoutDashboard },
   { href: '/insights', label: 'Insights', icon: TrendingUp },
+  { href: '/ask', label: 'Ask', icon: Sparkles },
   { href: '/facilities', label: 'Facilities', icon: Building2 },
   { href: '/orders', label: 'Orders', icon: PackageSearch },
   { href: '/tasks', label: 'Tasks', icon: ClipboardList },
@@ -26,6 +27,7 @@ const RADIAL_ITEMS = [
   { href: '/insights', label: 'Insights', icon: TrendingUp, ring: 0 },
   { href: '/facilities', label: 'Facilities', icon: Building2, ring: 0 },
   { href: '/tasks', label: 'Tasks', icon: ClipboardList, ring: 0 },
+  { href: '/ask', label: 'Ask', icon: Sparkles, ring: 1 },
   { href: '/orders', label: 'Orders', icon: PackageSearch, ring: 1 },
   { href: '/sourcing', label: 'Sourcing', icon: Ship, ring: 1 },
   { href: '/machines', label: 'Machines', icon: Wrench, ring: 1 },
@@ -38,7 +40,7 @@ const RADIAL_ITEMS = [
 // so outer items land between inner ones rather than directly behind them,
 // which keeps the labels from stacking on top of each other.
 const RINGS = [
-  { radius: 140, start: 14, end: 78 },
+  { radius: 126, start: 10, end: 82 },
   { radius: 215, start: 8, end: 84 },
 ]
 

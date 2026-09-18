@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
+import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod'
 
 const client = new Anthropic()
 
@@ -118,4 +119,168 @@ export async function generateBriefing(snapshot) {
   })
 
   return { parsed: response.parsed_output, model: response.model }
+}
+
+const ASSISTANT_SYSTEM_PROMPT = `You answer questions about a single customer account for a supplier of custom, large-volume ultrasonic cleaning machines. The owner sells machines and the detergent that runs in them to one large industrial customer with multiple facilities.
+
+You are given a snapshot of the account. It covers each facility's machines, consumable stock and forecasts, pipeline, inbound shipments, action item counts and contact history. For anything the snapshot does not cover — the wording of specific action items, what a meeting actually said, individual orders, consumption history over time — use the tools.
+
+How to answer:
+
+- Answer the question that was asked, in as few words as it takes. This is a busy owner on a phone, not a report.
+- Cite the actual numbers and names behind your answer so he can check it.
+- If the data does not answer the question, say so plainly and say what is missing. Never fill a gap with a plausible guess.
+- Distinguish "the data says no" from "nobody has recorded this". A site with no logged usage is not a site with no usage.
+- Use the tools when the answer needs detail rather than guessing from the snapshot's aggregates.`
+
+// Read-only lookups for detail the snapshot summarizes away. Every query is
+// parameterized against a fixed shape — the model chooses filters, never SQL.
+function buildTools(dbClient) {
+  return [
+    betaZodTool({
+      name: 'list_action_items',
+      description: 'Action items with their full descriptions, owners and due dates. Use when asked what is outstanding, overdue, or who owns something.',
+      inputSchema: z.object({
+        facility_id: z.number().nullable().describe('Limit to one facility, or null for all'),
+        status: z.enum(['open', 'done', 'any']).describe('Filter by status'),
+      }),
+      run: async ({ facility_id, status }) => {
+        const result = await dbClient.query(
+          `SELECT a.id, a.description, a.owner, a.due_date, a.status, f.name AS facility
+           FROM action_items a LEFT JOIN facilities f ON f.id = a.facility_id
+           WHERE ($1::int IS NULL OR a.facility_id = $1)
+             AND ($2 = 'any' OR a.status = $2)
+           ORDER BY a.due_date NULLS LAST LIMIT 100`,
+          [facility_id, status]
+        )
+        return JSON.stringify(result.rows)
+      },
+    }),
+
+    betaZodTool({
+      name: 'list_communications',
+      description: 'Meeting minutes, emails and call notes with their AI summaries. Use when asked what was discussed or agreed.',
+      inputSchema: z.object({
+        facility_id: z.number().nullable().describe('Limit to one facility, or null for all'),
+        limit: z.number().describe('How many of the most recent to return, up to 25'),
+      }),
+      run: async ({ facility_id, limit }) => {
+        const result = await dbClient.query(
+          `SELECT c.id, c.type, c.occurred_at, c.created_at, c.ai_summary, f.name AS facility
+           FROM communications c LEFT JOIN facilities f ON f.id = c.facility_id
+           WHERE ($1::int IS NULL OR c.facility_id = $1)
+           ORDER BY COALESCE(c.occurred_at, c.created_at) DESC LIMIT $2`,
+          [facility_id, Math.min(Math.max(Number(limit) || 10, 1), 25)]
+        )
+        return JSON.stringify(result.rows)
+      },
+    }),
+
+    betaZodTool({
+      name: 'list_orders',
+      description: 'Consumable and parts purchase orders, both directions, with line items. Use for questions about what was ordered, shipped or invoiced.',
+      inputSchema: z.object({
+        facility_id: z.number().nullable(),
+        direction: z.enum(['incoming', 'outgoing', 'any']).describe('incoming = sold to the customer, outgoing = bought from a supplier'),
+        status: z.string().nullable().describe('Exact PO status, or null for all'),
+      }),
+      run: async ({ facility_id, direction, status }) => {
+        const result = await dbClient.query(
+          `SELECT po.id, po.direction, po.status, po.po_number, po.total_value, po.expected_date,
+                  po.supplier_name, po.updated_at, f.name AS facility,
+                  COALESCE(json_agg(json_build_object('description', i.description, 'quantity', i.quantity,
+                    'unit_price', i.unit_price, 'product', p.name))
+                    FILTER (WHERE i.id IS NOT NULL), '[]') AS items
+           FROM purchase_orders po
+           LEFT JOIN facilities f ON f.id = po.facility_id
+           LEFT JOIN purchase_order_items i ON i.purchase_order_id = po.id
+           LEFT JOIN products p ON p.id = i.product_id
+           WHERE ($1::int IS NULL OR po.facility_id = $1)
+             AND ($2 = 'any' OR po.direction = $2)
+             AND ($3::text IS NULL OR po.status = $3)
+           GROUP BY po.id, f.name
+           ORDER BY po.updated_at DESC LIMIT 60`,
+          [facility_id, direction, status]
+        )
+        return JSON.stringify(result.rows)
+      },
+    }),
+
+    betaZodTool({
+      name: 'consumption_history',
+      description: 'Logged detergent usage, deliveries and adjustments over time. Use for questions about how much was actually used or delivered, and when.',
+      inputSchema: z.object({
+        facility_id: z.number().nullable(),
+        days: z.number().describe('How far back to look, in days'),
+      }),
+      run: async ({ facility_id, days }) => {
+        const result = await dbClient.query(
+          `SELECT l.logged_at, l.type, l.quantity, l.notes, p.name AS product, f.name AS facility
+           FROM consumption_logs l
+           JOIN products p ON p.id = l.product_id
+           LEFT JOIN facilities f ON f.id = l.facility_id
+           WHERE ($1::int IS NULL OR l.facility_id = $1)
+             AND l.logged_at > NOW() - ($2 || ' days')::interval
+           ORDER BY l.logged_at DESC LIMIT 200`,
+          [facility_id, String(Math.min(Math.max(Number(days) || 90, 1), 1095))]
+        )
+        return JSON.stringify(result.rows)
+      },
+    }),
+
+    betaZodTool({
+      name: 'list_sourcing_orders',
+      description: 'Machines on order from overseas manufacturers, with build stage, container and shipping detail. Use for questions about what is being built or shipped.',
+      inputSchema: z.object({
+        stage: z.string().nullable().describe('Exact sourcing stage, or null for all'),
+      }),
+      run: async ({ stage }) => {
+        const result = await dbClient.query(
+          `SELECT so.id, so.supplier_name, so.supplier_country, so.quantity, so.stage, so.total_cost,
+                  so.order_date, so.expected_ship_date, so.actual_ship_date, so.expected_arrival_date,
+                  so.actual_arrival_date, so.container_number, so.vessel_name, so.carrier,
+                  so.port_of_origin, so.port_of_destination, f.name AS destination_facility
+           FROM machine_sourcing_orders so
+           LEFT JOIN facilities f ON f.id = so.facility_id
+           WHERE ($1::text IS NULL OR so.stage = $1)
+           ORDER BY so.expected_arrival_date NULLS LAST LIMIT 60`,
+          [stage]
+        )
+        return JSON.stringify(result.rows)
+      },
+    }),
+  ]
+}
+
+// `history` is prior turns from the browser; roles are normalized and the
+// length capped so a tampered client can't reshape the conversation.
+export async function answerQuestion({ dbClient, snapshot, history, question }) {
+  const priorTurns = (Array.isArray(history) ? history : [])
+    .slice(-10)
+    .filter((turn) => turn && typeof turn.content === 'string' && turn.content.trim())
+    .map((turn) => ({
+      role: turn.role === 'assistant' ? 'assistant' : 'user',
+      content: turn.content.slice(0, 4000),
+    }))
+
+  const finalMessage = await client.beta.messages.toolRunner({
+    model: 'claude-opus-5',
+    max_tokens: 4096,
+    thinking: { type: 'adaptive' },
+    max_iterations: 8,
+    system: [
+      { type: 'text', text: ASSISTANT_SYSTEM_PROMPT },
+      { type: 'text', text: `Current account snapshot:\n${JSON.stringify(snapshot)}` },
+    ],
+    tools: buildTools(dbClient),
+    messages: [...priorTurns, { role: 'user', content: question }],
+  })
+
+  const answer = finalMessage.content
+    .filter((block) => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n')
+    .trim()
+
+  return { answer, model: finalMessage.model }
 }
