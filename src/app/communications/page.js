@@ -105,7 +105,7 @@ export default function CommunicationsPage() {
       <div className="dashboard-header">
         <div>
           <h1 className="gradient-text">Communications</h1>
-          <p style={{ color: '#94a3b8' }}>Upload meeting minutes and emails — Claude summarizes them and pulls out action items.</p>
+          <p style={{ color: 'var(--muted)' }}>Upload meeting minutes and emails — Claude summarizes them and pulls out action items.</p>
         </div>
       </div>
 
@@ -136,7 +136,7 @@ export default function CommunicationsPage() {
         >
           <Upload size={24} style={{ marginBottom: 8, opacity: 0.7 }} />
           <p>{isUploading ? 'Processing…' : 'Drag a file here, or click to choose one'}</p>
-          <p style={{ color: '#94a3b8', fontSize: '0.75rem' }}>.txt, .md, .vtt, .srt, .docx, .pdf, .eml</p>
+          <p style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>.txt, .md, .vtt, .srt, .docx, .pdf, .eml</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -172,18 +172,18 @@ export default function CommunicationsPage() {
               <div key={c.id} className="glass glass-card">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
                   <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <Icon size={18} color="#60a5fa" style={{ marginTop: 3 }} />
+                    <Icon size={18} color="var(--primary-hover)" style={{ marginTop: 3 }} />
                     <div>
                       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                         <span className="badge">{formatType(c.type)}</span>
-                        {c.source_filename && <span style={{ color: '#94a3b8', fontSize: '0.875rem' }}>{c.source_filename}</span>}
-                        <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                        {c.source_filename && <span style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>{c.source_filename}</span>}
+                        <span style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>
                           {new Date(c.occurred_at || c.created_at).toLocaleString()}
                         </span>
                       </div>
                       <p style={{ marginTop: 8 }}>{c.ai_summary || 'Summary unavailable.'}</p>
                       {Number(c.action_item_count) > 0 && (
-                        <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: 4 }}>
+                        <p style={{ color: 'var(--muted)', fontSize: '0.875rem', marginTop: 4 }}>
                           {c.action_item_count} action item{c.action_item_count === '1' ? '' : 's'} extracted
                         </p>
                       )}

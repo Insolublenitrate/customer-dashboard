@@ -66,7 +66,7 @@ function LoginForm() {
           />
 
           {error && (
-            <p style={{ color: '#f87171', fontSize: '0.875rem' }}>{error}</p>
+            <p style={{ color: 'var(--danger)', fontSize: '0.875rem' }}>{error}</p>
           )}
 
           <button type="submit" className="btn" disabled={isSubmitting} style={{ width: '100%' }}>

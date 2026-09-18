@@ -23,7 +23,7 @@ export default function FacilityDetailPage({ params }) {
 
   const fetchData = () => {
     fetch(`/api/facilities/${id}`)
-      .then((res) => res.json())
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Failed to load facility'))))
       .then(setData)
       .catch((err) => console.error('Failed to load facility:', err))
       .finally(() => setLoading(false))
@@ -76,10 +76,21 @@ export default function FacilityDetailPage({ params }) {
     fetchData()
   }
 
-  if (loading || !data) {
+  if (loading) {
     return (
       <main className="container">
         <div className="loader" />
+      </main>
+    )
+  }
+
+  if (!data) {
+    return (
+      <main className="container">
+        <Link href="/facilities" className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: '1.5rem', width: 'fit-content' }}>
+          <ArrowLeft size={16} /> All facilities
+        </Link>
+        <div className="glass empty-state">Couldn&apos;t find that facility.</div>
       </main>
     )
   }
@@ -98,7 +109,7 @@ export default function FacilityDetailPage({ params }) {
             {facility.name}{' '}
             {facility.is_mother_location && <span className="badge">Mother location</span>}
           </h1>
-          <p style={{ color: '#94a3b8' }}>
+          <p style={{ color: 'var(--muted)' }}>
             {[facility.address, facility.city, facility.state, facility.zip].filter(Boolean).join(', ') || 'No address on file'}
           </p>
         </div>
@@ -107,7 +118,7 @@ export default function FacilityDetailPage({ params }) {
       {facility.regulatory_notes && (
         <div className="glass glass-card" style={{ marginBottom: '2rem' }}>
           <h3>Regulatory / regional notes</h3>
-          <p style={{ color: '#cbd5e1', whiteSpace: 'pre-wrap' }}>{facility.regulatory_notes}</p>
+          <p style={{ color: 'var(--foreground)', whiteSpace: 'pre-wrap' }}>{facility.regulatory_notes}</p>
         </div>
       )}
 
@@ -141,17 +152,17 @@ export default function FacilityDetailPage({ params }) {
           )}
 
           {contacts.length === 0 ? (
-            <p style={{ color: '#94a3b8' }}>No contacts yet.</p>
+            <p style={{ color: 'var(--muted)' }}>No contacts yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {contacts.map((c) => (
                 <div key={c.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    {c.is_primary && <Star size={14} color="#fbbf24" fill="#fbbf24" />}
+                    {c.is_primary && <Star size={14} color="var(--warning)" fill="var(--warning)" />}
                     <strong>{c.name}</strong>
-                    {c.title && <span style={{ color: '#94a3b8' }}>— {c.title}</span>}
+                    {c.title && <span style={{ color: 'var(--muted)' }}>— {c.title}</span>}
                   </div>
-                  <div style={{ color: '#94a3b8', fontSize: '0.875rem' }}>
+                  <div style={{ color: 'var(--muted)', fontSize: '0.875rem' }}>
                     {[c.email, c.phone].filter(Boolean).join(' · ')}
                   </div>
                 </div>
@@ -186,7 +197,7 @@ export default function FacilityDetailPage({ params }) {
           )}
 
           {projects.length === 0 ? (
-            <p style={{ color: '#94a3b8' }}>No projects yet.</p>
+            <p style={{ color: 'var(--muted)' }}>No projects yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {projects.map((p) => (
@@ -198,9 +209,9 @@ export default function FacilityDetailPage({ params }) {
                       {PROJECT_STATUSES.map((s) => <option key={s} value={s}>{formatStatus(s)}</option>)}
                     </select>
                   </div>
-                  {p.spec_summary && <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginTop: 4 }}>{p.spec_summary}</p>}
+                  {p.spec_summary && <p style={{ color: 'var(--muted)', fontSize: '0.875rem', marginTop: 4 }}>{p.spec_summary}</p>}
                   {(p.quote_value || p.target_date) && (
-                    <div style={{ color: '#94a3b8', fontSize: '0.75rem', marginTop: 4 }}>
+                    <div style={{ color: 'var(--muted)', fontSize: '0.75rem', marginTop: 4 }}>
                       {p.quote_value && <span>${Number(p.quote_value).toLocaleString()}</span>}
                       {p.quote_value && p.target_date && ' · '}
                       {p.target_date && <span>Target {new Date(p.target_date).toLocaleDateString()}</span>}
@@ -218,7 +229,7 @@ export default function FacilityDetailPage({ params }) {
         <div className="glass glass-card">
           <h3>Action items</h3>
           {actionItems.length === 0 ? (
-            <p style={{ color: '#94a3b8' }}>Nothing outstanding.</p>
+            <p style={{ color: 'var(--muted)' }}>Nothing outstanding.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {actionItems.map((item) => (
@@ -226,8 +237,8 @@ export default function FacilityDetailPage({ params }) {
                   <input type="checkbox" checked={item.status === 'done'} onChange={() => toggleActionItem(item)} style={{ marginTop: 4 }} />
                   <span style={{ textDecoration: item.status === 'done' ? 'line-through' : 'none' }}>
                     {item.description}
-                    {item.owner && <span style={{ color: '#94a3b8' }}> — {item.owner}</span>}
-                    {item.due_date && <span style={{ color: '#94a3b8' }}> (due {new Date(item.due_date).toLocaleDateString()})</span>}
+                    {item.owner && <span style={{ color: 'var(--muted)' }}> — {item.owner}</span>}
+                    {item.due_date && <span style={{ color: 'var(--muted)' }}> (due {new Date(item.due_date).toLocaleDateString()})</span>}
                   </span>
                 </label>
               ))}
@@ -242,14 +253,14 @@ export default function FacilityDetailPage({ params }) {
             <Link href="/communications" className="btn btn-secondary">Upload</Link>
           </div>
           {communications.length === 0 ? (
-            <p style={{ color: '#94a3b8', marginTop: '1rem' }}>Nothing uploaded for this facility yet.</p>
+            <p style={{ color: 'var(--muted)', marginTop: '1rem' }}>Nothing uploaded for this facility yet.</p>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: '1rem' }}>
               {communications.map((c) => (
                 <div key={c.id} style={{ borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span className="badge">{formatStatus(c.type)}</span>
-                    <span style={{ color: '#94a3b8', fontSize: '0.75rem' }}>
+                    <span style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>
                       {new Date(c.occurred_at || c.created_at).toLocaleDateString()}
                     </span>
                   </div>

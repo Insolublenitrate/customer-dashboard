@@ -60,10 +60,10 @@ export default function FacilitiesPage() {
       <div className="dashboard-header">
         <div>
           <h1 className="gradient-text">Facilities</h1>
-          <p style={{ color: '#94a3b8' }}>Every site for this account, mother location first.</p>
+          <p>Every site for this account, mother location first.</p>
         </div>
         <button className="btn" onClick={() => setIsModalOpen(true)}>
-          <Plus size={16} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+          <Plus size={16} />
           Add facility
         </button>
       </div>
@@ -71,20 +71,20 @@ export default function FacilitiesPage() {
       {loading ? (
         <div className="loader" />
       ) : facilities.length === 0 ? (
-        <div className="glass glass-card">No facilities yet. Add the first one to get started.</div>
+        <div className="glass empty-state">No facilities yet. Add the first one to get started.</div>
       ) : (
         <div className="metrics-grid">
           {facilities.map((f) => (
-            <Link key={f.id} href={`/facilities/${f.id}`} className="glass glass-card" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
+            <Link key={f.id} href={`/facilities/${f.id}`} className="glass glass-card interactive" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <Building2 size={18} color="#60a5fa" />
+                <Building2 size={18} color="var(--primary-hover)" />
                 <h3 style={{ margin: 0 }}>{f.name}</h3>
                 {f.is_mother_location && <span className="badge">Mother location</span>}
               </div>
-              <p style={{ color: '#94a3b8', fontSize: '0.875rem', marginBottom: 12 }}>
+              <p className="text-muted" style={{ fontSize: '0.875rem', marginBottom: 12 }}>
                 {[f.city, f.state].filter(Boolean).join(', ') || 'No location on file'}
               </p>
-              <div style={{ display: 'flex', gap: 16, fontSize: '0.875rem' }}>
+              <div className="text-muted" style={{ display: 'flex', gap: 16, fontSize: '0.8125rem' }}>
                 <span>{f.active_project_count} active project{f.active_project_count === '1' ? '' : 's'}</span>
                 <span>{f.open_action_item_count} open item{f.open_action_item_count === '1' ? '' : 's'}</span>
               </div>
@@ -94,11 +94,11 @@ export default function FacilitiesPage() {
       )}
 
       {isModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1.5rem', zIndex: 50 }}>
-          <form onSubmit={handleSubmit} className="glass glass-card" style={{ width: '100%', maxWidth: 480 }}>
+        <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
+          <form onSubmit={handleSubmit} className="glass modal-panel" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0 }}>Add facility</h2>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.4rem' }}>
+              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
                 <X size={16} />
               </button>
             </div>
@@ -112,16 +112,16 @@ export default function FacilitiesPage() {
               </label>
               <input className="input" placeholder="Address" value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })} />
-              <div style={{ display: 'flex', gap: '0.75rem' }}>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <input className="input" placeholder="City" value={form.city}
-                  onChange={(e) => setForm({ ...form, city: e.target.value })} style={{ flex: 1 }} />
+                  onChange={(e) => setForm({ ...form, city: e.target.value })} style={{ flex: '2 1 120px' }} />
                 <select className="input" value={form.state}
-                  onChange={(e) => setForm({ ...form, state: e.target.value })} style={{ flex: 1 }}>
+                  onChange={(e) => setForm({ ...form, state: e.target.value })} style={{ flex: '1 1 90px' }}>
                   <option value="">State</option>
                   {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
                 <input className="input" placeholder="Zip" value={form.zip}
-                  onChange={(e) => setForm({ ...form, zip: e.target.value })} style={{ width: 100 }} />
+                  onChange={(e) => setForm({ ...form, zip: e.target.value })} style={{ flex: '1 1 90px' }} />
               </div>
               <textarea className="input" placeholder="Regulatory notes (regional codes, requirements, etc.)"
                 rows={3} value={form.regulatory_notes}

@@ -2,14 +2,20 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { LayoutDashboard, Building2, MessageSquare, ClipboardList, LogOut } from 'lucide-react'
 import { authClient } from '@/lib/auth-client'
 
 const LINKS = [
-  { href: '/', label: 'Overview' },
-  { href: '/facilities', label: 'Facilities' },
-  { href: '/communications', label: 'Communications' },
-  { href: '/tasks', label: 'Tasks' },
+  { href: '/', label: 'Overview', icon: LayoutDashboard },
+  { href: '/facilities', label: 'Facilities', icon: Building2 },
+  { href: '/communications', label: 'Communications', icon: MessageSquare },
+  { href: '/tasks', label: 'Tasks', icon: ClipboardList },
 ]
+
+function isActive(pathname, href) {
+  if (href === '/') return pathname === '/'
+  return pathname.startsWith(href)
+}
 
 export default function NavBar() {
   const pathname = usePathname()
@@ -25,28 +31,57 @@ export default function NavBar() {
   }
 
   return (
-    <div className="container" style={{ paddingBottom: 0 }}>
-      <div className="nav-tabs" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+    <>
+      <header className="top-bar">
+        <Link href="/" className="top-bar-brand">
+          <span
+            style={{
+              width: 8, height: 8, borderRadius: 999,
+              background: 'linear-gradient(135deg, var(--primary), var(--accent))',
+              flexShrink: 0,
+            }}
+          />
+          Account Dashboard
+        </Link>
+
+        <nav className="top-bar-links">
           {LINKS.map((link) => (
             <Link
               key={link.href}
               href={link.href}
-              className={`btn ${pathname === link.href ? '' : 'btn-secondary'}`}
+              className={`top-bar-link ${isActive(pathname, link.href) ? 'is-active' : ''}`}
             >
               {link.label}
             </Link>
           ))}
-        </div>
+        </nav>
+
         {session?.user && (
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <span style={{ color: '#94a3b8', fontSize: '0.875rem' }}>{session.user.name}</span>
-            <button onClick={handleSignOut} className="btn btn-secondary">
-              Sign out
+          <div className="top-bar-user">
+            <span>{session.user.name}</span>
+            <button onClick={handleSignOut} className="btn btn-secondary" style={{ padding: '0.4rem 0.7rem', minHeight: 'auto' }}>
+              <LogOut size={14} />
             </button>
           </div>
         )}
-      </div>
-    </div>
+      </header>
+
+      <nav className="bottom-nav">
+        {LINKS.map((link) => {
+          const Icon = link.icon
+          const active = isActive(pathname, link.href)
+          return (
+            <Link
+              key={link.href}
+              href={link.href}
+              className={`bottom-nav-link ${active ? 'is-active' : ''}`}
+            >
+              <Icon size={20} strokeWidth={active ? 2.4 : 2} />
+              {link.label}
+            </Link>
+          )
+        })}
+      </nav>
+    </>
   )
 }

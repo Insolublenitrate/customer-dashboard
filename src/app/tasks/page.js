@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { Calendar, User } from 'lucide-react'
 
 export default function TasksPage() {
   const [items, setItems] = useState([])
@@ -38,7 +39,7 @@ export default function TasksPage() {
       <div className="dashboard-header">
         <div>
           <h1 className="gradient-text">Tasks</h1>
-          <p style={{ color: '#94a3b8' }}>Every action item across all facilities.</p>
+          <p>Every action item across all facilities.</p>
         </div>
       </div>
 
@@ -61,43 +62,45 @@ export default function TasksPage() {
       {loading ? (
         <div className="loader" />
       ) : items.length === 0 ? (
-        <div className="glass glass-card">Nothing here.</div>
+        <div className="glass empty-state">Nothing here.</div>
       ) : (
-        <div className="table-container glass">
-          <table className="table">
-            <thead>
-              <tr>
-                <th style={{ width: 32 }}></th>
-                <th>Description</th>
-                <th>Facility</th>
-                <th>Owner</th>
-                <th>Due</th>
-              </tr>
-            </thead>
-            <tbody>
-              {items.map((item) => (
-                <tr key={item.id} style={{ opacity: item.status === 'done' ? 0.5 : 1 }}>
-                  <td>
-                    <input type="checkbox" checked={item.status === 'done'} onChange={() => toggleItem(item)} />
-                  </td>
-                  <td style={{ textDecoration: item.status === 'done' ? 'line-through' : 'none' }}>{item.description}</td>
-                  <td>
-                    <Link href={`/facilities/${item.facility_id}`} style={{ color: '#60a5fa' }}>
+        <div className="row-list">
+          {items.map((item) => {
+            const isOverdue = item.status === 'open' && item.due_date && new Date(item.due_date) < new Date()
+            return (
+              <div key={item.id} className={`glass row-card ${item.status === 'done' ? 'is-done' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={item.status === 'done'}
+                  onChange={() => toggleItem(item)}
+                  style={{ marginTop: 3, width: 18, height: 18, flexShrink: 0, accentColor: 'var(--primary)' }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ textDecoration: item.status === 'done' ? 'line-through' : 'none' }}>
+                    {item.description}
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.875rem', flexWrap: 'wrap', marginTop: '0.5rem', fontSize: '0.8125rem' }} className="text-muted">
+                    <Link href={`/facilities/${item.facility_id}`} className="badge" style={{ textDecoration: 'none' }}>
                       {item.facility_name}
                     </Link>
-                  </td>
-                  <td>{item.owner || '—'}</td>
-                  <td>
-                    {item.due_date ? (
-                      <span style={{ color: item.status === 'open' && new Date(item.due_date) < new Date() ? '#f87171' : 'inherit' }}>
-                        {new Date(item.due_date).toLocaleDateString()}
+                    {item.owner && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                        <User size={13} /> {item.owner}
                       </span>
-                    ) : '—'}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    )}
+                    {item.due_date && (
+                      <span
+                        className={isOverdue ? undefined : 'text-muted'}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: isOverdue ? 'var(--danger)' : undefined }}
+                      >
+                        <Calendar size={13} /> {new Date(item.due_date).toLocaleDateString()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </main>

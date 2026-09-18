@@ -31,13 +31,13 @@ const USMap = ({ facilities }) => {
               <Geography
                 key={geo.rsmKey}
                 geography={geo}
-                fill="#1e293b"
-                stroke="#334155"
+                fill="#12141a"
+                stroke="#23262f"
                 strokeWidth={1}
                 style={{
                   default: { outline: "none" },
-                  hover: { fill: "#334155", outline: "none" },
-                  pressed: { fill: "#1e293b", outline: "none" },
+                  hover: { fill: "#1c1f28", outline: "none" },
+                  pressed: { fill: "#12141a", outline: "none" },
                 }}
               />
             ))
@@ -52,15 +52,15 @@ const USMap = ({ facilities }) => {
             <Marker key={facility.id} coordinates={coords}>
               <circle
                 r={facility.is_mother_location ? 9 : 6}
-                fill={facility.is_mother_location ? "#8b5cf6" : "#10b981"}
-                opacity={0.85}
-                stroke="#0f172a"
+                fill={facility.is_mother_location ? "#6366f1" : "#22d3ee"}
+                opacity={0.9}
+                stroke="#08090c"
                 strokeWidth={1.5}
               />
               <text
                 textAnchor="middle"
                 y={facility.is_mother_location ? 22 : 18}
-                style={{ fontFamily: "system-ui", fill: "#94a3b8", fontSize: "10px" }}
+                style={{ fontFamily: "var(--font-sans, system-ui)", fill: "#8b8f9a", fontSize: "10px" }}
               >
                 {facility.name}
               </text>
