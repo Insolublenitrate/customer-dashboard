@@ -1,4 +1,4 @@
-import { computeStockForecast } from './consumption'
+import { computeStockForecast } from './consumption.js'
 
 // Gathers the facts behind a draft. Each kind pulls only what that message
 // needs, so the model is never asked to pick the relevant detail out of the

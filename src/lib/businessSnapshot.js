@@ -1,4 +1,4 @@
-import { computeStockForecast, theoreticalWeeklyUsage } from './consumption'
+import { computeStockForecast, theoreticalWeeklyUsage } from './consumption.js'
 
 // Builds the compact picture of the account that the AI advisor reasons over.
 // Deliberately pre-computes the derived numbers (days of stock left, planned

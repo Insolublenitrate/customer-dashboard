@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth'
 import { admin } from 'better-auth/plugins'
 import { Pool } from 'pg'
-import { accessControl, roles, SYSTEM_ADMIN, OWNER } from './roles'
+import { accessControl, roles, SYSTEM_ADMIN, OWNER } from './roles.js'
 
 // better-auth's Postgres/Kysely adapter needs a real `pg.Pool`, not the
 // @neondatabase/serverless client @vercel/postgres wraps elsewhere in this

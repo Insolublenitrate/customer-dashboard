@@ -1,4 +1,4 @@
-import { apiFetch } from './apiFetch'
+import { apiFetch } from './apiFetch.js'
 
 // The client and the server validate against the same schema, so a 400 here
 // means the server caught something the client could not — a stale select

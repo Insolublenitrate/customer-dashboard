@@ -2,7 +2,7 @@
 
 import { createAuthClient } from 'better-auth/react'
 import { adminClient } from 'better-auth/client/plugins'
-import { accessControl, roles } from './roles'
+import { accessControl, roles } from './roles.js'
 
 // The same access control the server uses, so the UI can ask whether the signed
 // in person may do something before offering it. This only decides what is

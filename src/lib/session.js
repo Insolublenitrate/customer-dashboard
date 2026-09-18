@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { NextResponse } from 'next/server'
-import { auth } from './auth'
-import { SYSTEM_ADMIN, ROLES } from './roles'
+import { auth } from './auth.js'
+import { SYSTEM_ADMIN, ROLES } from './roles.js'
 
 // id is null, not a fake string, because communications.uploaded_by is a real
 // foreign key into better-auth's "user" table (ON DELETE SET NULL) — a

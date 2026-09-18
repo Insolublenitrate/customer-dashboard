@@ -2,8 +2,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod'
-import { AI_MODEL } from './aiConfig'
-import { recordUsage } from './aiUsage'
+import { AI_MODEL } from './aiConfig.js'
+import { recordUsage } from './aiUsage.js'
 
 const client = new Anthropic()
 

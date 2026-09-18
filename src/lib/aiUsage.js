@@ -1,4 +1,4 @@
-import { withClient } from './db'
+import { withClient } from './db.js'
 
 // Recording a call must never be the reason a call fails: the feature already
 // worked by the time we get here, so a ledger write that throws is logged and

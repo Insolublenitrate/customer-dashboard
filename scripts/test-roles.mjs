@@ -47,6 +47,17 @@ ok('a cache write is 1.25x the input rate',
 ok('an unpriced model reports null rather than a made-up number',
   costOf({ model: 'not-a-model', input_tokens: 1e6 }) === null)
 
+// scripts/createUser.mjs runs under plain node, not through Next's bundler, so
+// every import in its chain must resolve without one. An extensionless
+// `from './roles'` in auth.js resolves fine under Next and breaks the script —
+// which is how account creation silently broke once already.
+try {
+  await import('../src/lib/auth.js')
+  ok('src/lib/auth.js imports under plain node (createUser.mjs depends on it)', true)
+} catch (err) {
+  ok('src/lib/auth.js imports under plain node (createUser.mjs depends on it)', false, String(err).slice(0, 120))
+}
+
 let fail = 0
 for (const r of results) { if (!r.pass) fail++; console.log(`${r.pass ? 'ok  ' : 'FAIL'}  ${r.n}${r.pass ? '' : `  -> ${r.d}`}`) }
 console.log(`\n${results.length - fail} passed, ${fail} failed`)
