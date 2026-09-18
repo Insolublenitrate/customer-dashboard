@@ -257,6 +257,17 @@ async function migrate() {
   // Links an installed machine back to the sourcing order that brought it in.
   await client.query(`ALTER TABLE machines ADD COLUMN IF NOT EXISTS sourcing_order_id INTEGER REFERENCES machine_sourcing_orders(id) ON DELETE SET NULL;`)
 
+  console.log('Creating ai_briefings...')
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS ai_briefings (
+      id SERIAL PRIMARY KEY,
+      headline TEXT NOT NULL,
+      findings JSONB NOT NULL,
+      model TEXT,
+      generated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+
   console.log('Domain schema migration complete.')
   client.release()
   process.exit(0)

@@ -7,6 +7,7 @@ import {
 } from 'recharts'
 import { TrendingUp, TrendingDown, Minus, Flame, Trophy, Droplets, Ship } from 'lucide-react'
 import { formatCompactCurrency, formatStatus, periodDelta } from '@/lib/format'
+import Briefing from '../components/Briefing'
 
 function daysUntil(dateStr) {
   if (!dateStr) return null
@@ -105,10 +106,24 @@ export default function InsightsPage() {
     )
   }
 
+  // The briefing is independent of the chart aggregates, so it stays on the
+  // page even when those fail to load — losing the analysis because an
+  // unrelated query broke would be the wrong trade.
+  const header = (
+    <div className="dashboard-header">
+      <div>
+        <h1 className="gradient-text">Insights</h1>
+        <p>Trends, rankings, and where to look next.</p>
+      </div>
+    </div>
+  )
+
   if (!data) {
     return (
       <main className="container">
-        <div className="glass empty-state">Couldn&apos;t load insights. Try refreshing.</div>
+        {header}
+        <Briefing />
+        <div className="glass empty-state">Couldn&apos;t load the charts. Try refreshing.</div>
       </main>
     )
   }
@@ -142,12 +157,9 @@ export default function InsightsPage() {
 
   return (
     <main className="container">
-      <div className="dashboard-header">
-        <div>
-          <h1 className="gradient-text">Insights</h1>
-          <p>Trends, rankings, and where to look next.</p>
-        </div>
-      </div>
+      {header}
+
+      <Briefing />
 
       <div className="metrics-grid">
         <div className="glass glass-card">

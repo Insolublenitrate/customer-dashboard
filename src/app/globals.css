@@ -445,6 +445,14 @@ a.glass-card:hover,
   color: var(--muted);
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
 /* Per-screen metric strip */
 .metric-strip {
   display: flex;
