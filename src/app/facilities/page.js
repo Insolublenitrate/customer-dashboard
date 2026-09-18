@@ -1,9 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { Building2, Plus, X } from 'lucide-react'
+import { FacilitySchema } from '@/lib/schemas'
+import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
+import FormError from '../components/FormError'
 
 const US_STATES = [
   'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA', 'HI', 'ID', 'IL', 'IN', 'IA',
@@ -20,8 +25,10 @@ export default function FacilitiesPage() {
   const [facilities, setFacilities] = useState([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [isSaving, setIsSaving] = useState(false)
+  const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(FacilitySchema),
+    defaultValues: emptyForm,
+  })
 
   const fetchFacilities = () => {
     fetch('/api/facilities')
@@ -35,25 +42,22 @@ export default function FacilitiesPage() {
     fetchFacilities()
   }, [])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSaving(true)
-    try {
-      const res = await fetch('/api/facilities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      if (!res.ok) throw new Error('Failed to create facility')
-      setIsModalOpen(false)
-      setForm(emptyForm)
-      fetchFacilities()
-    } catch (err) {
-      console.error(err)
-      alert('Failed to create facility')
-    } finally {
-      setIsSaving(false)
-    }
+  const onSubmit = async (data) => {
+    const result = await submitJson({
+      url: '/api/facilities',
+      data,
+      setError,
+      fallback: 'Failed to create facility',
+    })
+    if (!result) return
+    setIsModalOpen(false)
+    reset(emptyForm)
+    fetchFacilities()
+  }
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    reset(emptyForm)
   }
 
   return (
@@ -97,40 +101,37 @@ export default function FacilitiesPage() {
       )}
 
       {isModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
-          <form onSubmit={handleSubmit} className="glass modal-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={closeModal}>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="glass modal-panel" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0 }}>Add facility</h2>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
                 <X size={16} />
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <input className="input" placeholder="Facility name" required value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })} />
+              <div className="field">
+                <input className={`input ${errors.name ? 'input-invalid' : ''}`} placeholder="Facility name" {...register('name')} />
+                <FormError error={errors.name} />
+              </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.875rem' }}>
-                <input type="checkbox" checked={form.is_mother_location}
-                  onChange={(e) => setForm({ ...form, is_mother_location: e.target.checked })} />
+                <input type="checkbox" {...register('is_mother_location')} />
                 This is the mother/HQ location
               </label>
-              <input className="input" placeholder="Address" value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })} />
+              <input className="input" placeholder="Address" {...register('address')} />
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <input className="input" placeholder="City" value={form.city}
-                  onChange={(e) => setForm({ ...form, city: e.target.value })} style={{ flex: '2 1 120px' }} />
-                <select className="input" value={form.state}
-                  onChange={(e) => setForm({ ...form, state: e.target.value })} style={{ flex: '1 1 90px' }}>
+                <input className="input" placeholder="City" {...register('city')} style={{ flex: '2 1 120px' }} />
+                <select className="input" {...register('state')} style={{ flex: '1 1 90px' }}>
                   <option value="">State</option>
                   {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
                 </select>
-                <input className="input" placeholder="Zip" value={form.zip}
-                  onChange={(e) => setForm({ ...form, zip: e.target.value })} style={{ flex: '1 1 90px' }} />
+                <input className="input" placeholder="Zip" {...register('zip')} style={{ flex: '1 1 90px' }} />
               </div>
               <textarea className="input" placeholder="Regulatory notes (regional codes, requirements, etc.)"
-                rows={3} value={form.regulatory_notes}
-                onChange={(e) => setForm({ ...form, regulatory_notes: e.target.value })} />
-              <button type="submit" className="btn" disabled={isSaving}>
-                {isSaving ? 'Saving…' : 'Add facility'}
+                rows={3} {...register('regulatory_notes')} />
+              <FormError error={errors.root} />
+              <button type="submit" className="btn" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : 'Add facility'}
               </button>
             </div>
           </form>

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
-import { MACHINE_STATUSES } from '@/lib/constants'
+import { MachineSchema, validationError } from '@/lib/schemas'
 
 export async function GET(request) {
   const { unauthorized } = await requireSession()
@@ -42,11 +42,9 @@ export async function POST(request) {
   if (unauthorized) return unauthorized
 
   try {
-    const body = await request.json()
-    if (!body.facility_id) {
-      return NextResponse.json({ error: 'facility_id is required' }, { status: 400 })
-    }
-    const status = MACHINE_STATUSES.includes(body.status) ? body.status : 'active'
+    const parsed = MachineSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const data = parsed.data
 
     const machine = await withClient(async (client) => {
       const result = await client.query(
@@ -54,18 +52,9 @@ export async function POST(request) {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
          RETURNING *`,
         [
-          body.facility_id,
-          body.project_id || null,
-          body.machine_model_id || null,
-          body.sourcing_order_id || null,
-          body.serial_number || null,
-          body.model || null,
-          body.install_date || null,
-          status,
-          body.default_product_id || null,
-          body.tank_capacity || null,
-          body.fill_frequency_per_week || null,
-          body.notes || null,
+          data.facility_id, data.project_id, data.machine_model_id, data.sourcing_order_id,
+          data.serial_number, data.model, data.install_date, data.status,
+          data.default_product_id, data.tank_capacity, data.fill_frequency_per_week, data.notes,
         ]
       )
       return result.rows[0]

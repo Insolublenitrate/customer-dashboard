@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
-import { CONSUMPTION_LOG_TYPES } from '@/lib/constants'
+import { ConsumptionLogSchema, validationError } from '@/lib/schemas'
 import { computeStockForecast } from '@/lib/consumption'
 
 export async function GET(request, { params }) {
@@ -80,15 +80,11 @@ export async function POST(request, { params }) {
   const { id } = await params
 
   try {
-    const body = await request.json()
-    if (!body.product_id || body.quantity === undefined || body.quantity === null) {
-      return NextResponse.json({ error: 'product_id and quantity are required' }, { status: 400 })
-    }
-    const type = CONSUMPTION_LOG_TYPES.includes(body.type) ? body.type : 'usage'
-    const enteredQuantity = Number(body.quantity)
-    if (Number.isNaN(enteredQuantity)) {
-      return NextResponse.json({ error: 'quantity must be a number' }, { status: 400 })
-    }
+    const parsed = ConsumptionLogSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const body = parsed.data
+    const type = body.type
+    const enteredQuantity = body.quantity
 
     const result = await withClient(async (client) => {
       const existing = await client.query(

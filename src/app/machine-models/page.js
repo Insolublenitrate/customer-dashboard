@@ -1,9 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Boxes, Plus, X } from 'lucide-react'
 import { detergentPerFill } from '@/lib/consumption'
+import { MachineModelSchema } from '@/lib/schemas'
+import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
+import FormError from '../components/FormError'
 
 const emptyForm = { name: '', tank_capacity: '', fill_frequency_per_week: '', notes: '' }
 
@@ -11,8 +16,10 @@ export default function MachineModelsPage() {
   const [machineModels, setMachineModels] = useState([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [isSaving, setIsSaving] = useState(false)
+  const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(MachineModelSchema),
+    defaultValues: emptyForm,
+  })
 
   const fetchMachineModels = () => {
     fetch('/api/machine-models')
@@ -26,25 +33,22 @@ export default function MachineModelsPage() {
     fetchMachineModels()
   }, [])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSaving(true)
-    try {
-      const res = await fetch('/api/machine-models', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      if (!res.ok) throw new Error('Failed to create machine model')
-      setIsModalOpen(false)
-      setForm(emptyForm)
-      fetchMachineModels()
-    } catch (err) {
-      console.error(err)
-      alert('Failed to create machine model')
-    } finally {
-      setIsSaving(false)
-    }
+  const onSubmit = async (data) => {
+    const result = await submitJson({
+      url: '/api/machine-models',
+      data,
+      setError,
+      fallback: 'Failed to create machine model',
+    })
+    if (!result) return
+    setIsModalOpen(false)
+    reset(emptyForm)
+    fetchMachineModels()
+  }
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    reset(emptyForm)
   }
 
   return (
@@ -93,27 +97,33 @@ export default function MachineModelsPage() {
       )}
 
       {isModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
-          <form onSubmit={handleSubmit} className="glass modal-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={closeModal}>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="glass modal-panel" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0 }}>Add machine model</h2>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
                 <X size={16} />
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <input className="input" placeholder="Name (e.g. US-1200XL)" required value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <input className="input" type="number" step="any" placeholder="Tank capacity (gal)" required value={form.tank_capacity}
-                  onChange={(e) => setForm({ ...form, tank_capacity: e.target.value })} style={{ flex: '1 1 160px' }} />
-                <input className="input" type="number" step="any" placeholder="Typical fills/week" value={form.fill_frequency_per_week}
-                  onChange={(e) => setForm({ ...form, fill_frequency_per_week: e.target.value })} style={{ flex: '1 1 160px' }} />
+              <div className="field">
+                <input className={`input ${errors.name ? 'input-invalid' : ''}`} placeholder="Name (e.g. US-1200XL)" {...register('name')} />
+                <FormError error={errors.name} />
               </div>
-              <textarea className="input" placeholder="Notes" rows={3} value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-              <button type="submit" className="btn" disabled={isSaving}>
-                {isSaving ? 'Saving…' : 'Add model'}
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <div className="field" style={{ flex: '1 1 160px' }}>
+                  <input className={`input ${errors.tank_capacity ? 'input-invalid' : ''}`} type="number" step="any" placeholder="Tank capacity (gal)" {...register('tank_capacity')} />
+                  <FormError error={errors.tank_capacity} />
+                </div>
+                <div className="field" style={{ flex: '1 1 160px' }}>
+                  <input className={`input ${errors.fill_frequency_per_week ? 'input-invalid' : ''}`} type="number" step="any" placeholder="Typical fills/week" {...register('fill_frequency_per_week')} />
+                  <FormError error={errors.fill_frequency_per_week} />
+                </div>
+              </div>
+              <textarea className="input" placeholder="Notes" rows={3} {...register('notes')} />
+              <FormError error={errors.root} />
+              <button type="submit" className="btn" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : 'Add model'}
               </button>
             </div>
           </form>

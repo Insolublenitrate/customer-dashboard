@@ -1,8 +1,13 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Package, Plus, X } from 'lucide-react'
+import { ProductSchema } from '@/lib/schemas'
+import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
+import FormError from '../components/FormError'
 
 const emptyForm = { name: '', sku: '', unit: 'gallon', unit_price: '', supplier_name: '', reorder_lead_time_days: 14 }
 
@@ -10,8 +15,10 @@ export default function ProductsPage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [isSaving, setIsSaving] = useState(false)
+  const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(ProductSchema),
+    defaultValues: emptyForm,
+  })
 
   const fetchProducts = () => {
     fetch('/api/products')
@@ -25,25 +32,22 @@ export default function ProductsPage() {
     fetchProducts()
   }, [])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSaving(true)
-    try {
-      const res = await fetch('/api/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      if (!res.ok) throw new Error('Failed to create product')
-      setIsModalOpen(false)
-      setForm(emptyForm)
-      fetchProducts()
-    } catch (err) {
-      console.error(err)
-      alert('Failed to create product')
-    } finally {
-      setIsSaving(false)
-    }
+  const onSubmit = async (data) => {
+    const result = await submitJson({
+      url: '/api/products',
+      data,
+      setError,
+      fallback: 'Failed to create product',
+    })
+    if (!result) return
+    setIsModalOpen(false)
+    reset(emptyForm)
+    fetchProducts()
+  }
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    reset(emptyForm)
   }
 
   return (
@@ -85,34 +89,36 @@ export default function ProductsPage() {
       )}
 
       {isModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
-          <form onSubmit={handleSubmit} className="glass modal-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={closeModal}>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="glass modal-panel" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0 }}>Add product</h2>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
                 <X size={16} />
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <input className="input" placeholder="Name (e.g. UltraClean 40 Detergent)" required value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <input className="input" placeholder="SKU (optional)" value={form.sku}
-                onChange={(e) => setForm({ ...form, sku: e.target.value })} />
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <input className="input" placeholder="Unit (e.g. gallon, drum)" value={form.unit}
-                  onChange={(e) => setForm({ ...form, unit: e.target.value })} style={{ flex: '1 1 120px' }} />
-                <input className="input" type="number" step="0.01" placeholder="Unit price ($)" value={form.unit_price}
-                  onChange={(e) => setForm({ ...form, unit_price: e.target.value })} style={{ flex: '1 1 120px' }} />
+              <div className="field">
+                <input className={`input ${errors.name ? 'input-invalid' : ''}`} placeholder="Name (e.g. UltraClean 40 Detergent)" {...register('name')} />
+                <FormError error={errors.name} />
               </div>
-              <input className="input" placeholder="Supplier name" value={form.supplier_name}
-                onChange={(e) => setForm({ ...form, supplier_name: e.target.value })} />
+              <input className="input" placeholder="SKU (optional)" {...register('sku')} />
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                <input className="input" placeholder="Unit (e.g. gallon, drum)" {...register('unit')} style={{ flex: '1 1 120px' }} />
+                <div className="field" style={{ flex: '1 1 120px' }}>
+                  <input className={`input ${errors.unit_price ? 'input-invalid' : ''}`} type="number" step="0.01" placeholder="Unit price ($)" {...register('unit_price')} />
+                  <FormError error={errors.unit_price} />
+                </div>
+              </div>
+              <input className="input" placeholder="Supplier name" {...register('supplier_name')} />
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.8125rem' }} className="text-muted">
                 Reorder lead time (days)
-                <input className="input" type="number" value={form.reorder_lead_time_days}
-                  onChange={(e) => setForm({ ...form, reorder_lead_time_days: e.target.value })} />
+                <input className={`input ${errors.reorder_lead_time_days ? 'input-invalid' : ''}`} type="number" {...register('reorder_lead_time_days')} />
               </label>
-              <button type="submit" className="btn" disabled={isSaving}>
-                {isSaving ? 'Saving…' : 'Add product'}
+              <FormError error={errors.reorder_lead_time_days} />
+              <FormError error={errors.root} />
+              <button type="submit" className="btn" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : 'Add product'}
               </button>
             </div>
           </form>

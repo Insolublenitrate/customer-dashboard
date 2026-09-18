@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
-import { PROJECT_STATUSES } from '@/lib/constants'
+import { ProjectSchema, validationError } from '@/lib/schemas'
 
 export async function GET() {
   const { unauthorized } = await requireSession()
@@ -29,18 +29,16 @@ export async function POST(request) {
   if (unauthorized) return unauthorized
 
   try {
-    const body = await request.json()
-    if (!body.facility_id || !body.title) {
-      return NextResponse.json({ error: 'facility_id and title are required' }, { status: 400 })
-    }
-    const status = PROJECT_STATUSES.includes(body.status) ? body.status : 'discovery'
+    const parsed = ProjectSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const data = parsed.data
 
     const project = await withClient(async (client) => {
       const result = await client.query(
         `INSERT INTO projects (facility_id, title, spec_summary, status, quote_value, target_date)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [body.facility_id, body.title, body.spec_summary || null, status, body.quote_value || null, body.target_date || null]
+        [data.facility_id, data.title, data.spec_summary, data.status, data.quote_value, data.target_date]
       )
       return result.rows[0]
     })

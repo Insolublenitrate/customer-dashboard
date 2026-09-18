@@ -1,31 +1,23 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { ContactSchema, validationError } from '@/lib/schemas'
 
 export async function POST(request) {
   const { unauthorized } = await requireSession()
   if (unauthorized) return unauthorized
 
   try {
-    const body = await request.json()
-    if (!body.facility_id || !body.name) {
-      return NextResponse.json({ error: 'facility_id and name are required' }, { status: 400 })
-    }
+    const parsed = ContactSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const data = parsed.data
 
     const contact = await withClient(async (client) => {
       const result = await client.query(
         `INSERT INTO contacts (facility_id, name, title, email, phone, is_primary, notes)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING *`,
-        [
-          body.facility_id,
-          body.name,
-          body.title || null,
-          body.email || null,
-          body.phone || null,
-          !!body.is_primary,
-          body.notes || null,
-        ]
+        [data.facility_id, data.name, data.title, data.email, data.phone, data.is_primary, data.notes]
       )
       return result.rows[0]
     })

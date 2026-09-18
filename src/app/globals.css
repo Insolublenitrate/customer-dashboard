@@ -199,6 +199,35 @@ a.glass-card:hover,
   box-shadow: 0 0 0 3px var(--ring);
 }
 
+/* A rejected field says why, next to itself. Before this the only signal was an
+   alert() carrying the server's first message with no idea which input caused it. */
+.input.input-invalid {
+  border-color: var(--danger);
+}
+
+.input.input-invalid:focus {
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.35);
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.8125rem;
+  margin: -0.35rem 0 0;
+}
+
+/* Inputs sharing a flex row each need their own error line under them, so the
+   pair is wrapped rather than the inputs being siblings. */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.field > .input {
+  width: 100%;
+}
+
 .btn {
   background: var(--primary);
   color: #fff;

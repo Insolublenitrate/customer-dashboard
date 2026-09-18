@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { ProductSchema, validationError } from '@/lib/schemas'
 
 export async function GET() {
   const { unauthorized } = await requireSession()
@@ -23,24 +24,16 @@ export async function POST(request) {
   if (unauthorized) return unauthorized
 
   try {
-    const body = await request.json()
-    if (!body.name) {
-      return NextResponse.json({ error: 'name is required' }, { status: 400 })
-    }
+    const parsed = ProductSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const data = parsed.data
 
     const product = await withClient(async (client) => {
       const result = await client.query(
         `INSERT INTO products (name, sku, unit, unit_price, supplier_name, reorder_lead_time_days)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING *`,
-        [
-          body.name,
-          body.sku || null,
-          body.unit || 'gallon',
-          body.unit_price || null,
-          body.supplier_name || null,
-          body.reorder_lead_time_days || 14,
-        ]
+        [data.name, data.sku, data.unit, data.unit_price, data.supplier_name, data.reorder_lead_time_days]
       )
       return result.rows[0]
     })

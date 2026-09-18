@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { FacilitySchema, validationError } from '@/lib/schemas'
 
 export async function GET() {
   const { unauthorized } = await requireSession()
@@ -33,10 +34,9 @@ export async function POST(request) {
   if (unauthorized) return unauthorized
 
   try {
-    const body = await request.json()
-    if (!body.name) {
-      return NextResponse.json({ error: 'name is required' }, { status: 400 })
-    }
+    const parsed = FacilitySchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const data = parsed.data
 
     const facility = await withClient(async (client) => {
       const result = await client.query(
@@ -44,15 +44,8 @@ export async function POST(request) {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
          RETURNING *`,
         [
-          body.name,
-          !!body.is_mother_location,
-          body.address || null,
-          body.city || null,
-          body.state || null,
-          body.zip || null,
-          body.region || null,
-          body.regulatory_notes || null,
-          body.status || 'active',
+          data.name, data.is_mother_location, data.address, data.city, data.state,
+          data.zip, data.region, data.regulatory_notes, data.status,
         ]
       )
       return result.rows[0]

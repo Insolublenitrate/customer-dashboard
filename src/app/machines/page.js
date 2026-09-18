@@ -1,11 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useForm, useWatch } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { Wrench, Plus, X } from 'lucide-react'
 import { MACHINE_STATUSES } from '@/lib/constants'
 import { detergentPerFill } from '@/lib/consumption'
+import { MachineSchema } from '@/lib/schemas'
+import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
+import FormError from '../components/FormError'
 
 const emptyForm = {
   facility_id: '', machine_model_id: '', sourcing_order_id: '', serial_number: '', model: '', install_date: '', status: 'active',
@@ -32,8 +37,13 @@ export default function MachinesPage() {
   const [loading, setLoading] = useState(true)
   const [facilityFilter, setFacilityFilter] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [isSaving, setIsSaving] = useState(false)
+  const { register, handleSubmit, reset, setValue, control, setError, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(MachineSchema),
+    defaultValues: emptyForm,
+  })
+  // useWatch, not watch(): watch() re-renders the whole page on every keystroke
+  // and the React Compiler cannot memoize it (react-hooks/incompatible-library).
+  const tankCapacity = useWatch({ control, name: 'tank_capacity' })
 
   const fetchAll = () => {
     const params = new URLSearchParams()
@@ -61,13 +71,12 @@ export default function MachinesPage() {
   // name — all still overridable per unit (e.g. a field-modified tank).
   const applyMachineModel = (machineModelId) => {
     const model = machineModels.find((m) => String(m.id) === machineModelId)
-    setForm((f) => ({
-      ...f,
-      machine_model_id: machineModelId,
-      model: model ? model.name : f.model,
-      tank_capacity: model ? model.tank_capacity : f.tank_capacity,
-      fill_frequency_per_week: model?.fill_frequency_per_week ?? f.fill_frequency_per_week,
-    }))
+    if (!model) return
+    setValue('model', model.name)
+    setValue('tank_capacity', model.tank_capacity, { shouldValidate: true })
+    if (model.fill_frequency_per_week != null) {
+      setValue('fill_frequency_per_week', model.fill_frequency_per_week, { shouldValidate: true })
+    }
   }
 
   useEffect(() => {
@@ -75,25 +84,22 @@ export default function MachinesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facilityFilter])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSaving(true)
-    try {
-      const res = await fetch('/api/machines', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      if (!res.ok) throw new Error('Failed to create machine')
-      setIsModalOpen(false)
-      setForm(emptyForm)
-      fetchAll()
-    } catch (err) {
-      console.error(err)
-      alert('Failed to create machine')
-    } finally {
-      setIsSaving(false)
-    }
+  const onSubmit = async (data) => {
+    const result = await submitJson({
+      url: '/api/machines',
+      data,
+      setError,
+      fallback: 'Failed to create machine',
+    })
+    if (!result) return
+    setIsModalOpen(false)
+    reset(emptyForm)
+    fetchAll()
+  }
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    reset(emptyForm)
   }
 
   return (
@@ -150,61 +156,71 @@ export default function MachinesPage() {
       )}
 
       {isModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
-          <form onSubmit={handleSubmit} className="glass modal-panel" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={closeModal}>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="glass modal-panel" onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0 }}>Add machine</h2>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
                 <X size={16} />
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <select className="input" required value={form.facility_id} onChange={(e) => setForm({ ...form, facility_id: e.target.value })}>
-                <option value="">Facility…</option>
-                {facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-              </select>
+              <div className="field">
+                <select className={`input ${errors.facility_id ? 'input-invalid' : ''}`} {...register('facility_id')}>
+                  <option value="">Facility…</option>
+                  {facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+                <FormError error={errors.facility_id} />
+              </div>
               {machineModels.length > 0 && (
-                <select className="input" value={form.machine_model_id} onChange={(e) => applyMachineModel(e.target.value)}>
+                <select
+                  className="input"
+                  {...register('machine_model_id', { onChange: (e) => applyMachineModel(e.target.value) })}
+                >
                   <option value="">Machine model (optional, prefills size)…</option>
                   {machineModels.map((m) => <option key={m.id} value={m.id}>{m.name} — {Number(m.tank_capacity).toLocaleString()} gal</option>)}
                 </select>
               )}
               {sourcingOrders.length > 0 && (
-                <select className="input" value={form.sourcing_order_id} onChange={(e) => setForm({ ...form, sourcing_order_id: e.target.value })}>
+                <select className="input" {...register('sourcing_order_id')}>
                   <option value="">Sourced from order (optional)…</option>
                   {sourcingOrders.map((o) => <option key={o.id} value={o.id}>{o.supplier_name} — {o.machine_model_name || 'build'}</option>)}
                 </select>
               )}
-              <input className="input" placeholder="Model / designation" value={form.model}
-                onChange={(e) => setForm({ ...form, model: e.target.value })} />
-              <input className="input" placeholder="Serial number" value={form.serial_number}
-                onChange={(e) => setForm({ ...form, serial_number: e.target.value })} />
+              <input className="input" placeholder="Model / designation" {...register('model')} />
+              <input className="input" placeholder="Serial number" {...register('serial_number')} />
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <input className="input" type="date" value={form.install_date}
-                  onChange={(e) => setForm({ ...form, install_date: e.target.value })} style={{ flex: '1 1 150px' }} />
-                <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })} style={{ flex: '1 1 130px' }}>
+                <div className="field" style={{ flex: '1 1 150px' }}>
+                  <input className={`input ${errors.install_date ? 'input-invalid' : ''}`} type="date" {...register('install_date')} />
+                  <FormError error={errors.install_date} />
+                </div>
+                <select className="input" {...register('status')} style={{ flex: '1 1 130px' }}>
                   {MACHINE_STATUSES.map((s) => <option key={s} value={s}>{formatStatus(s)}</option>)}
                 </select>
               </div>
-              <select className="input" value={form.default_product_id} onChange={(e) => setForm({ ...form, default_product_id: e.target.value })}>
+              <select className="input" {...register('default_product_id')}>
                 <option value="">Detergent used (optional)…</option>
                 {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <input className="input" type="number" step="any" placeholder="Tank capacity (gal)" value={form.tank_capacity}
-                  onChange={(e) => setForm({ ...form, tank_capacity: e.target.value })} style={{ flex: '1 1 160px' }} />
-                <input className="input" type="number" step="any" placeholder="Fills per week" value={form.fill_frequency_per_week}
-                  onChange={(e) => setForm({ ...form, fill_frequency_per_week: e.target.value })} style={{ flex: '1 1 160px' }} />
+                <div className="field" style={{ flex: '1 1 160px' }}>
+                  <input className={`input ${errors.tank_capacity ? 'input-invalid' : ''}`} type="number" step="any" placeholder="Tank capacity (gal)" {...register('tank_capacity')} />
+                  <FormError error={errors.tank_capacity} />
+                </div>
+                <div className="field" style={{ flex: '1 1 160px' }}>
+                  <input className={`input ${errors.fill_frequency_per_week ? 'input-invalid' : ''}`} type="number" step="any" placeholder="Fills per week" {...register('fill_frequency_per_week')} />
+                  <FormError error={errors.fill_frequency_per_week} />
+                </div>
               </div>
-              {form.tank_capacity > 0 && (
+              {tankCapacity > 0 && (
                 <p className="text-muted" style={{ fontSize: '0.8125rem', margin: 0 }}>
-                  ~{detergentPerFill(form.tank_capacity)?.toLocaleString(undefined, { maximumFractionDigits: 1 })} gal detergent per fill (10%)
+                  ~{detergentPerFill(tankCapacity)?.toLocaleString(undefined, { maximumFractionDigits: 1 })} gal detergent per fill (10%)
                 </p>
               )}
-              <textarea className="input" placeholder="Notes" rows={3} value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-              <button type="submit" className="btn" disabled={isSaving}>
-                {isSaving ? 'Saving…' : 'Add machine'}
+              <textarea className="input" placeholder="Notes" rows={3} {...register('notes')} />
+              <FormError error={errors.root} />
+              <button type="submit" className="btn" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : 'Add machine'}
               </button>
             </div>
           </form>

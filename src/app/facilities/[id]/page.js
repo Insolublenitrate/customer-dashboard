@@ -1,11 +1,16 @@
 'use client'
 
 import { useEffect, useState, use as usePromise } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { ArrowLeft, Plus, Star, Wrench, AlertTriangle } from 'lucide-react'
 import { PROJECT_STATUSES, MACHINE_STATUSES } from '@/lib/constants'
+import { ContactSchema, ProjectSchema, MachineSchema, ConsumptionLogSchema } from '@/lib/schemas'
+import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../../components/MetricStrip'
 import DraftButton from '../../components/DraftButton'
+import FormError from '../../components/FormError'
 
 const emptyContact = { name: '', title: '', email: '', phone: '', is_primary: false }
 const emptyProject = { title: '', spec_summary: '', status: 'discovery', quote_value: '', target_date: '' }
@@ -28,10 +33,12 @@ export default function FacilityDetailPage({ params }) {
   const [showProjectForm, setShowProjectForm] = useState(false)
   const [showMachineForm, setShowMachineForm] = useState(false)
   const [showLogForm, setShowLogForm] = useState(false)
-  const [contactForm, setContactForm] = useState(emptyContact)
-  const [projectForm, setProjectForm] = useState(emptyProject)
-  const [machineForm, setMachineForm] = useState(emptyMachine)
-  const [logForm, setLogForm] = useState(emptyLog)
+  // Four independent forms on one screen, so four independent useForm
+  // instances — a shared one would let a bad contact block a machine.
+  const contact = useForm({ resolver: zodResolver(ContactSchema), defaultValues: { ...emptyContact, facility_id: id } })
+  const project = useForm({ resolver: zodResolver(ProjectSchema), defaultValues: { ...emptyProject, facility_id: id } })
+  const machine = useForm({ resolver: zodResolver(MachineSchema), defaultValues: { ...emptyMachine, facility_id: id } })
+  const log = useForm({ resolver: zodResolver(ConsumptionLogSchema), defaultValues: emptyLog })
 
   const fetchData = () => {
     Promise.all([
@@ -59,63 +66,55 @@ export default function FacilityDetailPage({ params }) {
 
   const applyMachineModel = (machineModelId) => {
     const model = machineModels.find((m) => String(m.id) === machineModelId)
-    setMachineForm((f) => ({
-      ...f,
-      machine_model_id: machineModelId,
-      model: model ? model.name : f.model,
-      tank_capacity: model ? model.tank_capacity : f.tank_capacity,
-      fill_frequency_per_week: model?.fill_frequency_per_week ?? f.fill_frequency_per_week,
-    }))
+    if (!model) return
+    machine.setValue('model', model.name)
+    machine.setValue('tank_capacity', model.tank_capacity, { shouldValidate: true })
+    if (model.fill_frequency_per_week != null) {
+      machine.setValue('fill_frequency_per_week', model.fill_frequency_per_week, { shouldValidate: true })
+    }
   }
 
-  const addMachine = async (e) => {
-    e.preventDefault()
-    await fetch('/api/machines', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...machineForm, facility_id: id }),
+  // Each of these used to fire-and-forget: no res.ok check, so a rejected POST
+  // still closed the form and refetched, and the row simply never appeared.
+  const addMachine = machine.handleSubmit(async (data) => {
+    const result = await submitJson({
+      url: '/api/machines', data, setError: machine.setError, fallback: 'Failed to add machine',
     })
+    if (!result) return
     setShowMachineForm(false)
-    setMachineForm(emptyMachine)
+    machine.reset({ ...emptyMachine, facility_id: id })
     fetchData()
-  }
+  })
 
-  const logConsumption = async (e) => {
-    e.preventDefault()
-    if (!logForm.product_id || !logForm.quantity) return
-    await fetch(`/api/facilities/${id}/stock`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(logForm),
+  const logConsumption = log.handleSubmit(async (data) => {
+    const result = await submitJson({
+      url: `/api/facilities/${id}/stock`, data, setError: log.setError, fallback: 'Failed to log entry',
     })
+    if (!result) return
     setShowLogForm(false)
-    setLogForm(emptyLog)
+    log.reset(emptyLog)
     fetchData()
-  }
+  })
 
-  const addContact = async (e) => {
-    e.preventDefault()
-    await fetch('/api/contacts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...contactForm, facility_id: id }),
+  const addContact = contact.handleSubmit(async (data) => {
+    const result = await submitJson({
+      url: '/api/contacts', data, setError: contact.setError, fallback: 'Failed to add contact',
     })
+    if (!result) return
     setShowContactForm(false)
-    setContactForm(emptyContact)
+    contact.reset({ ...emptyContact, facility_id: id })
     fetchData()
-  }
+  })
 
-  const addProject = async (e) => {
-    e.preventDefault()
-    await fetch('/api/projects', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...projectForm, facility_id: id }),
+  const addProject = project.handleSubmit(async (data) => {
+    const result = await submitJson({
+      url: '/api/projects', data, setError: project.setError, fallback: 'Failed to add project',
     })
+    if (!result) return
     setShowProjectForm(false)
-    setProjectForm(emptyProject)
+    project.reset({ ...emptyProject, facility_id: id })
     fetchData()
-  }
+  })
 
   const updateProjectStatus = async (projectId, status) => {
     await fetch(`/api/projects/${projectId}`, {
@@ -219,23 +218,27 @@ export default function FacilityDetailPage({ params }) {
           </div>
 
           {showLogForm && (
-            <form onSubmit={logConsumption} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
-              <select className="input" required value={logForm.product_id}
-                onChange={(e) => setLogForm({ ...logForm, product_id: e.target.value })}>
-                <option value="">Product…</option>
-                {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </select>
+            <form onSubmit={logConsumption} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+              <div className="field">
+                <select className={`input ${log.formState.errors.product_id ? 'input-invalid' : ''}`} {...log.register('product_id')}>
+                  <option value="">Product…</option>
+                  {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <FormError error={log.formState.errors.product_id} />
+              </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <select className="input" value={logForm.type}
-                  onChange={(e) => setLogForm({ ...logForm, type: e.target.value })} style={{ flex: 1 }}>
+                <select className="input" {...log.register('type')} style={{ flex: 1 }}>
                   <option value="usage">Usage</option>
                   <option value="delivery">Delivery</option>
                   <option value="adjustment">Adjustment (set total)</option>
                 </select>
-                <input className="input" type="number" step="any" placeholder="Quantity" required value={logForm.quantity}
-                  onChange={(e) => setLogForm({ ...logForm, quantity: e.target.value })} style={{ flex: 1 }} />
+                <div className="field" style={{ flex: 1 }}>
+                  <input className={`input ${log.formState.errors.quantity ? 'input-invalid' : ''}`} type="number" step="any" placeholder="Quantity" {...log.register('quantity')} />
+                  <FormError error={log.formState.errors.quantity} />
+                </div>
               </div>
-              <button type="submit" className="btn">Log entry</button>
+              <FormError error={log.formState.errors.root} />
+              <button type="submit" className="btn" disabled={log.formState.isSubmitting}>Log entry</button>
             </form>
           )}
 
@@ -279,37 +282,40 @@ export default function FacilityDetailPage({ params }) {
           </div>
 
           {showMachineForm && (
-            <form onSubmit={addMachine} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+            <form onSubmit={addMachine} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
               {machineModels.length > 0 && (
-                <select className="input" value={machineForm.machine_model_id} onChange={(e) => applyMachineModel(e.target.value)}>
+                <select className="input" {...machine.register('machine_model_id', { onChange: (e) => applyMachineModel(e.target.value) })}>
                   <option value="">Machine model (optional, prefills size)…</option>
                   {machineModels.map((m) => <option key={m.id} value={m.id}>{m.name} — {Number(m.tank_capacity).toLocaleString()} gal</option>)}
                 </select>
               )}
-              <input className="input" placeholder="Model / designation" value={machineForm.model}
-                onChange={(e) => setMachineForm({ ...machineForm, model: e.target.value })} />
-              <input className="input" placeholder="Serial number" value={machineForm.serial_number}
-                onChange={(e) => setMachineForm({ ...machineForm, serial_number: e.target.value })} />
+              <input className="input" placeholder="Model / designation" {...machine.register('model')} />
+              <input className="input" placeholder="Serial number" {...machine.register('serial_number')} />
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <input className="input" type="date" value={machineForm.install_date}
-                  onChange={(e) => setMachineForm({ ...machineForm, install_date: e.target.value })} style={{ flex: '1 1 140px' }} />
-                <select className="input" value={machineForm.status}
-                  onChange={(e) => setMachineForm({ ...machineForm, status: e.target.value })} style={{ flex: '1 1 120px' }}>
+                <div className="field" style={{ flex: '1 1 140px' }}>
+                  <input className={`input ${machine.formState.errors.install_date ? 'input-invalid' : ''}`} type="date" {...machine.register('install_date')} />
+                  <FormError error={machine.formState.errors.install_date} />
+                </div>
+                <select className="input" {...machine.register('status')} style={{ flex: '1 1 120px' }}>
                   {MACHINE_STATUSES.map((s) => <option key={s} value={s}>{formatStatus(s)}</option>)}
                 </select>
               </div>
-              <select className="input" value={machineForm.default_product_id}
-                onChange={(e) => setMachineForm({ ...machineForm, default_product_id: e.target.value })}>
+              <select className="input" {...machine.register('default_product_id')}>
                 <option value="">Detergent used (optional)…</option>
                 {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
               </select>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <input className="input" type="number" step="any" placeholder="Tank capacity (gal)" value={machineForm.tank_capacity}
-                  onChange={(e) => setMachineForm({ ...machineForm, tank_capacity: e.target.value })} style={{ flex: '1 1 140px' }} />
-                <input className="input" type="number" step="any" placeholder="Fills per week" value={machineForm.fill_frequency_per_week}
-                  onChange={(e) => setMachineForm({ ...machineForm, fill_frequency_per_week: e.target.value })} style={{ flex: '1 1 140px' }} />
+                <div className="field" style={{ flex: '1 1 140px' }}>
+                  <input className={`input ${machine.formState.errors.tank_capacity ? 'input-invalid' : ''}`} type="number" step="any" placeholder="Tank capacity (gal)" {...machine.register('tank_capacity')} />
+                  <FormError error={machine.formState.errors.tank_capacity} />
+                </div>
+                <div className="field" style={{ flex: '1 1 140px' }}>
+                  <input className={`input ${machine.formState.errors.fill_frequency_per_week ? 'input-invalid' : ''}`} type="number" step="any" placeholder="Fills per week" {...machine.register('fill_frequency_per_week')} />
+                  <FormError error={machine.formState.errors.fill_frequency_per_week} />
+                </div>
               </div>
-              <button type="submit" className="btn">Add machine</button>
+              <FormError error={machine.formState.errors.root} />
+              <button type="submit" className="btn" disabled={machine.formState.isSubmitting}>Add machine</button>
             </form>
           )}
 
@@ -340,18 +346,24 @@ export default function FacilityDetailPage({ params }) {
           </div>
 
           {showProjectForm && (
-            <form onSubmit={addProject} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
-              <input className="input" placeholder="Project title (e.g. Line 3 ultrasonic cell)" required
-                value={projectForm.title} onChange={(e) => setProjectForm({ ...projectForm, title: e.target.value })} />
-              <textarea className="input" placeholder="Spec summary" rows={3} value={projectForm.spec_summary}
-                onChange={(e) => setProjectForm({ ...projectForm, spec_summary: e.target.value })} />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input className="input" type="number" placeholder="Quote value" value={projectForm.quote_value}
-                  onChange={(e) => setProjectForm({ ...projectForm, quote_value: e.target.value })} style={{ flex: 1 }} />
-                <input className="input" type="date" value={projectForm.target_date}
-                  onChange={(e) => setProjectForm({ ...projectForm, target_date: e.target.value })} style={{ flex: 1 }} />
+            <form onSubmit={addProject} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+              <div className="field">
+                <input className={`input ${project.formState.errors.title ? 'input-invalid' : ''}`} placeholder="Project title (e.g. Line 3 ultrasonic cell)" {...project.register('title')} />
+                <FormError error={project.formState.errors.title} />
               </div>
-              <button type="submit" className="btn">Add project</button>
+              <textarea className="input" placeholder="Spec summary" rows={3} {...project.register('spec_summary')} />
+              <div style={{ display: 'flex', gap: 8 }}>
+                <div className="field" style={{ flex: 1 }}>
+                  <input className={`input ${project.formState.errors.quote_value ? 'input-invalid' : ''}`} type="number" placeholder="Quote value" {...project.register('quote_value')} />
+                  <FormError error={project.formState.errors.quote_value} />
+                </div>
+                <div className="field" style={{ flex: 1 }}>
+                  <input className={`input ${project.formState.errors.target_date ? 'input-invalid' : ''}`} type="date" {...project.register('target_date')} />
+                  <FormError error={project.formState.errors.target_date} />
+                </div>
+              </div>
+              <FormError error={project.formState.errors.root} />
+              <button type="submit" className="btn" disabled={project.formState.isSubmitting}>Add project</button>
             </form>
           )}
 
@@ -394,21 +406,23 @@ export default function FacilityDetailPage({ params }) {
           </div>
 
           {showContactForm && (
-            <form onSubmit={addContact} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
-              <input className="input" placeholder="Name" required value={contactForm.name}
-                onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })} />
-              <input className="input" placeholder="Title" value={contactForm.title}
-                onChange={(e) => setContactForm({ ...contactForm, title: e.target.value })} />
-              <input className="input" placeholder="Email" value={contactForm.email}
-                onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })} />
-              <input className="input" placeholder="Phone" value={contactForm.phone}
-                onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })} />
+            <form onSubmit={addContact} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: '1rem' }}>
+              <div className="field">
+                <input className={`input ${contact.formState.errors.name ? 'input-invalid' : ''}`} placeholder="Name" {...contact.register('name')} />
+                <FormError error={contact.formState.errors.name} />
+              </div>
+              <input className="input" placeholder="Title" {...contact.register('title')} />
+              <div className="field">
+                <input className={`input ${contact.formState.errors.email ? 'input-invalid' : ''}`} placeholder="Email" {...contact.register('email')} />
+                <FormError error={contact.formState.errors.email} />
+              </div>
+              <input className="input" placeholder="Phone" {...contact.register('phone')} />
               <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.875rem' }}>
-                <input type="checkbox" checked={contactForm.is_primary}
-                  onChange={(e) => setContactForm({ ...contactForm, is_primary: e.target.checked })} />
+                <input type="checkbox" {...contact.register('is_primary')} />
                 Primary contact
               </label>
-              <button type="submit" className="btn">Add contact</button>
+              <FormError error={contact.formState.errors.root} />
+              <button type="submit" className="btn" disabled={contact.formState.isSubmitting}>Add contact</button>
             </form>
           )}
 

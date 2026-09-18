@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { PurchaseOrderSchema, validationError } from '@/lib/schemas'
 import { PO_DIRECTIONS, PO_STATUSES } from '@/lib/constants'
 
 export async function GET(request) {
@@ -51,19 +52,12 @@ export async function POST(request) {
   if (unauthorized) return unauthorized
 
   try {
-    const body = await request.json()
-    const direction = PO_DIRECTIONS.includes(body.direction) ? body.direction : 'incoming'
-    const status = PO_STATUSES.includes(body.status) ? body.status : 'draft'
-    const items = Array.isArray(body.items) ? body.items : []
+    const parsed = PurchaseOrderSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const data = parsed.data
+    const items = data.items
 
-    if (direction === 'incoming' && !body.facility_id) {
-      return NextResponse.json({ error: 'facility_id is required for incoming orders' }, { status: 400 })
-    }
-    if (direction === 'outgoing' && !body.supplier_name) {
-      return NextResponse.json({ error: 'supplier_name is required for outgoing orders' }, { status: 400 })
-    }
-
-    const computedTotal = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0), 0)
+    const computedTotal = items.reduce((sum, item) => sum + (item.quantity || 0) * (item.unit_price || 0), 0)
 
     const purchaseOrder = await withClient(async (client) => {
       const poResult = await client.query(
@@ -71,14 +65,11 @@ export async function POST(request) {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          RETURNING *`,
         [
-          direction,
-          direction === 'incoming' ? body.facility_id : null,
-          direction === 'outgoing' ? body.supplier_name : null,
-          status,
-          body.po_number || null,
-          body.expected_date || null,
-          body.total_value || computedTotal || null,
-          body.notes || null,
+          data.direction,
+          data.direction === 'incoming' ? data.facility_id : null,
+          data.direction === 'outgoing' ? data.supplier_name : null,
+          data.status, data.po_number, data.expected_date,
+          data.total_value ?? (computedTotal || null), data.notes,
         ]
       )
       const po = poResult.rows[0]
@@ -89,7 +80,7 @@ export async function POST(request) {
           `INSERT INTO purchase_order_items (purchase_order_id, product_id, description, quantity, unit_price)
            VALUES ($1, $2, $3, $4, $5)
            RETURNING *`,
-          [po.id, item.product_id || null, item.description || null, item.quantity || 1, item.unit_price || null]
+          [po.id, item.product_id, item.description, item.quantity, item.unit_price]
         )
         insertedItems.push(itemResult.rows[0])
       }

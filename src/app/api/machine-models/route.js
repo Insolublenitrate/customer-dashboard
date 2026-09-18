@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { MachineModelSchema, validationError } from '@/lib/schemas'
 
 export async function GET() {
   const { unauthorized } = await requireSession()
@@ -23,17 +24,16 @@ export async function POST(request) {
   if (unauthorized) return unauthorized
 
   try {
-    const body = await request.json()
-    if (!body.name || !body.tank_capacity) {
-      return NextResponse.json({ error: 'name and tank_capacity are required' }, { status: 400 })
-    }
+    const parsed = MachineModelSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const data = parsed.data
 
     const machineModel = await withClient(async (client) => {
       const result = await client.query(
         `INSERT INTO machine_models (name, tank_capacity, fill_frequency_per_week, notes)
          VALUES ($1, $2, $3, $4)
          RETURNING *`,
-        [body.name, body.tank_capacity, body.fill_frequency_per_week || null, body.notes || null]
+        [data.name, data.tank_capacity, data.fill_frequency_per_week, data.notes]
       )
       return result.rows[0]
     })

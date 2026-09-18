@@ -1,11 +1,16 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { Ship, Plus, X, AlertTriangle } from 'lucide-react'
 import { SOURCING_STAGES } from '@/lib/constants'
 import { formatStatus } from '@/lib/format'
+import { SourcingOrderSchema } from '@/lib/schemas'
+import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
+import FormError from '../components/FormError'
 
 const emptyForm = {
   project_id: '', facility_id: '', machine_model_id: '', supplier_name: '', supplier_country: '',
@@ -37,8 +42,10 @@ export default function SourcingPage() {
   const [loading, setLoading] = useState(true)
   const [stageFilter, setStageFilter] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [isSaving, setIsSaving] = useState(false)
+  const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(SourcingOrderSchema),
+    defaultValues: emptyForm,
+  })
 
   const fetchAll = () => {
     const params = new URLSearchParams()
@@ -65,25 +72,22 @@ export default function SourcingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stageFilter])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSaving(true)
-    try {
-      const res = await fetch('/api/sourcing-orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      if (!res.ok) throw new Error('Failed to create sourcing order')
-      setIsModalOpen(false)
-      setForm(emptyForm)
-      fetchAll()
-    } catch (err) {
-      console.error(err)
-      alert('Failed to create sourcing order')
-    } finally {
-      setIsSaving(false)
-    }
+  const onSubmit = async (data) => {
+    const result = await submitJson({
+      url: '/api/sourcing-orders',
+      data,
+      setError,
+      fallback: 'Failed to create sourcing order',
+    })
+    if (!result) return
+    setIsModalOpen(false)
+    reset(emptyForm)
+    fetchAll()
+  }
+
+  const closeModal = () => {
+    setIsModalOpen(false)
+    reset(emptyForm)
   }
 
   // Derived from the list already on screen rather than a second query —
@@ -180,62 +184,64 @@ export default function SourcingPage() {
       )}
 
       {isModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
-          <form onSubmit={handleSubmit} className="glass modal-panel" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={closeModal}>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="glass modal-panel" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0 }}>New sourcing order</h2>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
                 <X size={16} />
               </button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-              <input className="input" placeholder="Supplier / manufacturer name" required value={form.supplier_name}
-                onChange={(e) => setForm({ ...form, supplier_name: e.target.value })} />
-              <input className="input" placeholder="Supplier country" value={form.supplier_country}
-                onChange={(e) => setForm({ ...form, supplier_country: e.target.value })} />
+              <div className="field">
+                <input className={`input ${errors.supplier_name ? 'input-invalid' : ''}`} placeholder="Supplier / manufacturer name" {...register('supplier_name')} />
+                <FormError error={errors.supplier_name} />
+              </div>
+              <input className="input" placeholder="Supplier country" {...register('supplier_country')} />
               {machineModels.length > 0 && (
-                <select className="input" value={form.machine_model_id} onChange={(e) => setForm({ ...form, machine_model_id: e.target.value })}>
+                <select className="input" {...register('machine_model_id')}>
                   <option value="">Machine model (optional)…</option>
                   {machineModels.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
                 </select>
               )}
-              <select className="input" value={form.facility_id} onChange={(e) => setForm({ ...form, facility_id: e.target.value })}>
+              <select className="input" {...register('facility_id')}>
                 <option value="">Destination facility (optional)…</option>
                 {facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
               {projects.length > 0 && (
-                <select className="input" value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
+                <select className="input" {...register('project_id')}>
                   <option value="">Linked project (optional)…</option>
                   {projects.map((p) => <option key={p.id} value={p.id}>{p.title} — {p.facility_name}</option>)}
                 </select>
               )}
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                <input className="input" type="number" min="1" placeholder="Quantity" value={form.quantity}
-                  onChange={(e) => setForm({ ...form, quantity: e.target.value })} style={{ flex: '1 1 100px' }} />
-                <input className="input" type="number" step="0.01" placeholder="Total cost ($)" value={form.total_cost}
-                  onChange={(e) => setForm({ ...form, total_cost: e.target.value })} style={{ flex: '1 1 160px' }} />
+                <div className="field" style={{ flex: '1 1 100px' }}>
+                  <input className={`input ${errors.quantity ? 'input-invalid' : ''}`} type="number" min="1" placeholder="Quantity" {...register('quantity')} />
+                  <FormError error={errors.quantity} />
+                </div>
+                <div className="field" style={{ flex: '1 1 160px' }}>
+                  <input className={`input ${errors.total_cost ? 'input-invalid' : ''}`} type="number" step="0.01" placeholder="Total cost ($)" {...register('total_cost')} />
+                  <FormError error={errors.total_cost} />
+                </div>
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.8125rem', flex: '1 1 160px' }} className="text-muted">
                   Order date
-                  <input className="input" type="date" value={form.order_date}
-                    onChange={(e) => setForm({ ...form, order_date: e.target.value })} />
+                  <input className="input" type="date" {...register('order_date')} />
                 </label>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.8125rem', flex: '1 1 160px' }} className="text-muted">
                   Expected ship date
-                  <input className="input" type="date" value={form.expected_ship_date}
-                    onChange={(e) => setForm({ ...form, expected_ship_date: e.target.value })} />
+                  <input className="input" type="date" {...register('expected_ship_date')} />
                 </label>
               </div>
               <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.8125rem' }} className="text-muted">
                 Expected arrival date
-                <input className="input" type="date" value={form.expected_arrival_date}
-                  onChange={(e) => setForm({ ...form, expected_arrival_date: e.target.value })} />
+                <input className="input" type="date" {...register('expected_arrival_date')} />
               </label>
-              <textarea className="input" placeholder="Notes" rows={3} value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-              <button type="submit" className="btn" disabled={isSaving}>
-                {isSaving ? 'Saving…' : 'Create sourcing order'}
+              <textarea className="input" placeholder="Notes" rows={3} {...register('notes')} />
+              <FormError error={errors.root} />
+              <button type="submit" className="btn" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : 'Create sourcing order'}
               </button>
             </div>
           </form>

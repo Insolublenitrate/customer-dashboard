@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { SourcingOrderSchema, validationError } from '@/lib/schemas'
 import { SOURCING_STAGES } from '@/lib/constants'
 
 export async function GET(request) {
@@ -43,11 +44,9 @@ export async function POST(request) {
   if (unauthorized) return unauthorized
 
   try {
-    const body = await request.json()
-    if (!body.supplier_name) {
-      return NextResponse.json({ error: 'supplier_name is required' }, { status: 400 })
-    }
-    const stage = SOURCING_STAGES.includes(body.stage) ? body.stage : 'order_placed'
+    const parsed = SourcingOrderSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const data = parsed.data
 
     const sourcingOrder = await withClient(async (client) => {
       const result = await client.query(
@@ -58,27 +57,17 @@ export async function POST(request) {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
          RETURNING *`,
         [
-          body.project_id || null,
-          body.facility_id || null,
-          body.machine_model_id || null,
-          body.supplier_name,
-          body.supplier_country || null,
-          body.quantity || 1,
-          stage,
-          body.order_date || null,
-          body.deposit_amount || null,
-          body.deposit_paid_date || null,
-          body.total_cost || null,
-          body.expected_ship_date || null,
-          body.expected_arrival_date || null,
-          body.notes || null,
+          data.project_id, data.facility_id, data.machine_model_id, data.supplier_name,
+          data.supplier_country, data.quantity, data.stage, data.order_date,
+          data.deposit_amount, data.deposit_paid_date, data.total_cost,
+          data.expected_ship_date, data.expected_arrival_date, data.notes,
         ]
       )
       const order = result.rows[0]
 
       await client.query(
         `INSERT INTO sourcing_order_events (sourcing_order_id, stage, notes) VALUES ($1, $2, $3)`,
-        [order.id, stage, 'Order created']
+        [order.id, data.stage, 'Order created']
       )
 
       return order

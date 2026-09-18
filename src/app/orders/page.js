@@ -1,9 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useForm, useFieldArray, useWatch } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import { Plus, X, Trash2, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react'
 import { PO_STATUSES } from '@/lib/constants'
+import { PurchaseOrderSchema } from '@/lib/schemas'
+import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
+import FormError from '../components/FormError'
 
 const emptyItem = { product_id: '', description: '', quantity: 1, unit_price: '' }
 const emptyForm = {
@@ -31,8 +36,13 @@ export default function OrdersPage() {
   const [loading, setLoading] = useState(true)
   const [directionFilter, setDirectionFilter] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [form, setForm] = useState(emptyForm)
-  const [isSaving, setIsSaving] = useState(false)
+  const { register, handleSubmit, reset, control, setValue, setError, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(PurchaseOrderSchema),
+    defaultValues: emptyForm,
+  })
+  const { fields: itemFields, append: appendItem, remove: removeItem } = useFieldArray({ control, name: 'items' })
+  // Which party the order names depends on this, so the form watches it.
+  const direction = useWatch({ control, name: 'direction' })
 
   const fetchAll = () => {
     const params = new URLSearchParams()
@@ -57,32 +67,30 @@ export default function OrdersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [directionFilter])
 
-  const updateItem = (index, patch) => {
-    setForm((f) => ({ ...f, items: f.items.map((item, i) => (i === index ? { ...item, ...patch } : item)) }))
+  // Switching direction clears the field the other direction owns, so a value
+  // typed under one branch cannot be submitted under the other.
+  const setDirection = (next) => {
+    setValue('direction', next)
+    setValue(next === 'incoming' ? 'supplier_name' : 'facility_id', '')
   }
 
-  const addItemRow = () => setForm((f) => ({ ...f, items: [...f.items, { ...emptyItem }] }))
-  const removeItemRow = (index) => setForm((f) => ({ ...f, items: f.items.filter((_, i) => i !== index) }))
+  const onSubmit = async (data) => {
+    const result = await submitJson({
+      url: '/api/purchase-orders',
+      // A blank line row is a leftover, not an order line.
+      data: { ...data, items: data.items.filter((i) => i.product_id || i.description) },
+      setError,
+      fallback: 'Failed to create order',
+    })
+    if (!result) return
+    setIsModalOpen(false)
+    reset(emptyForm)
+    fetchAll()
+  }
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsSaving(true)
-    try {
-      const res = await fetch('/api/purchase-orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, items: form.items.filter((i) => i.product_id || i.description) }),
-      })
-      if (!res.ok) throw new Error('Failed to create order')
-      setIsModalOpen(false)
-      setForm(emptyForm)
-      fetchAll()
-    } catch (err) {
-      console.error(err)
-      alert('Failed to create order')
-    } finally {
-      setIsSaving(false)
-    }
+  const closeModal = () => {
+    setIsModalOpen(false)
+    reset(emptyForm)
   }
 
   const updateStatus = async (order, status) => {
@@ -164,74 +172,78 @@ export default function OrdersPage() {
       )}
 
       {isModalOpen && (
-        <div className="modal-backdrop" onClick={() => setIsModalOpen(false)}>
-          <form onSubmit={handleSubmit} className="glass modal-panel" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-backdrop" onClick={closeModal}>
+          <form onSubmit={handleSubmit(onSubmit)} noValidate className="glass modal-panel" style={{ maxWidth: 560 }} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
               <h2 style={{ margin: 0 }}>New order</h2>
-              <button type="button" onClick={() => setIsModalOpen(false)} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
+              <button type="button" onClick={closeModal} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
                 <X size={16} />
               </button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               <div className="input-group" style={{ marginBottom: 0 }}>
-                <button type="button" className={`btn ${form.direction === 'incoming' ? '' : 'btn-secondary'}`}
-                  onClick={() => setForm({ ...form, direction: 'incoming' })} style={{ flex: 1 }}>
+                <button type="button" className={`btn ${direction === 'incoming' ? '' : 'btn-secondary'}`}
+                  onClick={() => setDirection('incoming')} style={{ flex: 1 }}>
                   To customer
                 </button>
-                <button type="button" className={`btn ${form.direction === 'outgoing' ? '' : 'btn-secondary'}`}
-                  onClick={() => setForm({ ...form, direction: 'outgoing' })} style={{ flex: 1 }}>
+                <button type="button" className={`btn ${direction === 'outgoing' ? '' : 'btn-secondary'}`}
+                  onClick={() => setDirection('outgoing')} style={{ flex: 1 }}>
                   From supplier
                 </button>
               </div>
+              <input type="hidden" {...register('direction')} />
 
-              {form.direction === 'incoming' ? (
-                <select className="input" required value={form.facility_id} onChange={(e) => setForm({ ...form, facility_id: e.target.value })}>
-                  <option value="">Facility…</option>
-                  {facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-                </select>
+              {direction === 'incoming' ? (
+                <div className="field">
+                  <select className={`input ${errors.facility_id ? 'input-invalid' : ''}`} {...register('facility_id')}>
+                    <option value="">Facility…</option>
+                    {facilities.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                  </select>
+                  <FormError error={errors.facility_id} />
+                </div>
               ) : (
-                <input className="input" placeholder="Supplier name" required value={form.supplier_name}
-                  onChange={(e) => setForm({ ...form, supplier_name: e.target.value })} />
+                <div className="field">
+                  <input className={`input ${errors.supplier_name ? 'input-invalid' : ''}`} placeholder="Supplier name" {...register('supplier_name')} />
+                  <FormError error={errors.supplier_name} />
+                </div>
               )}
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <input className="input" placeholder="PO # (optional)" value={form.po_number}
-                  onChange={(e) => setForm({ ...form, po_number: e.target.value })} style={{ flex: '1 1 140px' }} />
-                <input className="input" type="date" value={form.expected_date}
-                  onChange={(e) => setForm({ ...form, expected_date: e.target.value })} style={{ flex: '1 1 140px' }} />
+                <input className="input" placeholder="PO # (optional)" {...register('po_number')} style={{ flex: '1 1 140px' }} />
+                <div className="field" style={{ flex: '1 1 140px' }}>
+                  <input className={`input ${errors.expected_date ? 'input-invalid' : ''}`} type="date" {...register('expected_date')} />
+                  <FormError error={errors.expected_date} />
+                </div>
               </div>
 
               <div>
                 <p className="text-muted" style={{ fontSize: '0.8125rem', marginBottom: 6 }}>Line items</p>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {form.items.map((item, index) => (
-                    <div key={index} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <select className="input" value={item.product_id}
-                        onChange={(e) => updateItem(index, { product_id: e.target.value })} style={{ flex: 2 }}>
+                  {itemFields.map((item, index) => (
+                    <div key={item.id} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <select className="input" {...register(`items.${index}.product_id`)} style={{ flex: 2 }}>
                         <option value="">Product…</option>
                         {products.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                       </select>
-                      <input className="input" type="number" placeholder="Qty" value={item.quantity}
-                        onChange={(e) => updateItem(index, { quantity: e.target.value })} style={{ flex: 1, minWidth: 0 }} />
-                      <input className="input" type="number" step="0.01" placeholder="$/unit" value={item.unit_price}
-                        onChange={(e) => updateItem(index, { unit_price: e.target.value })} style={{ flex: 1, minWidth: 0 }} />
-                      <button type="button" onClick={() => removeItemRow(index)} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
+                      <input className="input" type="number" placeholder="Qty" {...register(`items.${index}.quantity`)} style={{ flex: 1, minWidth: 0 }} />
+                      <input className="input" type="number" step="0.01" placeholder="$/unit" {...register(`items.${index}.unit_price`)} style={{ flex: 1, minWidth: 0 }} />
+                      <button type="button" onClick={() => removeItem(index)} className="btn btn-secondary" style={{ padding: '0.5rem', minHeight: 'auto' }}>
                         <Trash2 size={14} />
                       </button>
                     </div>
                   ))}
                 </div>
-                <button type="button" onClick={addItemRow} className="btn btn-secondary" style={{ marginTop: 8 }}>
+                <button type="button" onClick={() => appendItem({ ...emptyItem })} className="btn btn-secondary" style={{ marginTop: 8 }}>
                   <Plus size={14} /> Add line
                 </button>
               </div>
 
-              <textarea className="input" placeholder="Notes" rows={2} value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+              <textarea className="input" placeholder="Notes" rows={2} {...register('notes')} />
 
-              <button type="submit" className="btn" disabled={isSaving}>
-                {isSaving ? 'Saving…' : 'Create order'}
+              <FormError error={errors.root} />
+              <button type="submit" className="btn" disabled={isSubmitting}>
+                {isSubmitting ? 'Saving…' : 'Create order'}
               </button>
             </div>
           </form>
