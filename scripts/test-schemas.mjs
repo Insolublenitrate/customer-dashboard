@@ -94,5 +94,82 @@ t('lead time defaults to 14 when blank', () => {
   eq([r.data.reorder_lead_time_days, r.data.unit], [14, 'gallon'])
 })
 
+// ---------------------------------------------------------------------------
+// The edit paths POST a row straight back from the database, not a form. pg
+// hands back numerics as strings and dates as ISO timestamps, so these check
+// that a real row survives the round trip instead of 400-ing the user out of
+// a status change.
+
+console.log('\nUpdate schemas against real Postgres row shapes')
+
+t('machine row round-trips through MachineUpdateSchema', () => {
+  const row = {
+    id: 4, facility_id: 1, project_id: null, machine_model_id: 3, sourcing_order_id: null,
+    serial_number: 'SN-0042', model: 'US-1200XL', install_date: '2026-03-14T00:00:00.000Z',
+    status: 'needs_service', default_product_id: 7,
+    tank_capacity: '1200.00', fill_frequency_per_week: '4.0', notes: null,
+    created_at: '2026-03-01T12:00:00.000Z', facility_name: 'Plant A',
+  }
+  const r = S.MachineUpdateSchema.safeParse({ ...row, status: 'active' })
+  if (!r.success) throw new Error(JSON.stringify(r.error.issues))
+  eq([r.data.tank_capacity, r.data.fill_frequency_per_week, r.data.status], [1200, 4, 'active'])
+})
+
+t('purchase order row round-trips, items and all', () => {
+  const row = {
+    id: 9, direction: 'incoming', facility_id: 1, supplier_name: null, status: 'confirmed',
+    po_number: 'PO-1041', expected_date: '2026-10-01T00:00:00.000Z', total_value: '4820.50',
+    notes: null, items: [{ id: 22, purchase_order_id: 9, product_id: 7, description: null, quantity: '12.00', unit_price: '401.71' }],
+  }
+  const r = S.PurchaseOrderUpdateSchema.safeParse({ ...row, status: 'shipped' })
+  if (!r.success) throw new Error(JSON.stringify(r.error.issues))
+  eq([r.data.total_value, r.data.status, r.data.items[0].quantity, r.data.items[0].product_id], [4820.5, 'shipped', 12, 7])
+})
+
+t('sourcing order row round-trips with every date column set', () => {
+  const row = {
+    id: 2, project_id: null, facility_id: 1, machine_model_id: 3,
+    supplier_name: 'Acme Ultrasonics', supplier_country: 'DE', quantity: 2, stage: 'in_transit',
+    order_date: '2026-05-02T00:00:00.000Z', deposit_amount: '9000.00', deposit_paid_date: '2026-05-09T00:00:00.000Z',
+    total_cost: '45000.00', expected_ship_date: '2026-07-01T00:00:00.000Z', actual_ship_date: '2026-07-04T00:00:00.000Z',
+    expected_arrival_date: '2026-08-20T00:00:00.000Z', actual_arrival_date: null,
+    container_number: 'MSKU1234567', vessel_name: 'MV Rhine', carrier: 'Maersk',
+    port_of_origin: 'Hamburg', port_of_destination: 'Norfolk', tracking_url: null, notes: null,
+  }
+  const r = S.SourcingOrderSchema.safeParse({ ...row, stage: 'customs' })
+  if (!r.success) throw new Error(JSON.stringify(r.error.issues))
+  eq([r.data.quantity, r.data.total_cost, r.data.stage, r.data.actual_arrival_date], [2, 45000, 'customs', null])
+})
+
+t('project row round-trips through ProjectUpdateSchema', () => {
+  const row = {
+    id: 5, facility_id: 1, title: 'Line 3 ultrasonic cell', spec_summary: 'Two-stage',
+    status: 'quoted', quote_value: '128000.00', target_date: '2026-11-15T00:00:00.000Z',
+  }
+  const r = S.ProjectUpdateSchema.safeParse({ ...row, status: 'approved' })
+  if (!r.success) throw new Error(JSON.stringify(r.error.issues))
+  eq([r.data.quote_value, r.data.status], [128000, 'approved'])
+})
+
+// Deliberate, and unchanged from what the routes did before: an unrecognised
+// status becomes the default rather than a 400. Worth knowing, because it means
+// a stale client silently resets the field instead of failing loudly.
+t('an unknown status falls back rather than 400-ing a status change', () => {
+  const r = S.ProjectUpdateSchema.safeParse({ title: 'T', status: 'not-a-status' })
+  eq(r.data.status, 'discovery')
+})
+
+t('stock threshold rejects a blank threshold', () => {
+  const r = S.StockThresholdSchema.safeParse({ product_id: '7', reorder_threshold: '' })
+  if (r.success) throw new Error('should have failed')
+  eq(S.validationError(r).field, 'reorder_threshold')
+})
+
+t('action item create demands a facility', () => {
+  const r = S.ActionItemCreateSchema.safeParse({ description: 'Call Dana' })
+  if (r.success) throw new Error('should have failed')
+  eq(S.validationError(r).field, 'facility_id')
+})
+
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail ? 1 : 0)

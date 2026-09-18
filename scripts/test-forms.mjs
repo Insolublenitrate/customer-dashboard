@@ -232,6 +232,88 @@ const launch = () => chromium.launch({ executablePath: process.env.CHROMIUM_PATH
   await browser.close()
 }
 
+// ======================== edit forms and PUT paths =========================
+{
+  const ORDER = {
+    id: 2, project_id: null, facility_id: 1, machine_model_id: null, supplier_name: 'Acme Ultrasonics',
+    supplier_country: 'DE', quantity: 2, stage: 'in_transit', order_date: '2026-05-02T00:00:00.000Z',
+    deposit_amount: '9000.00', deposit_paid_date: '2026-05-09T00:00:00.000Z', total_cost: '45000.00',
+    expected_ship_date: '2026-07-01T00:00:00.000Z', actual_ship_date: null,
+    expected_arrival_date: '2026-08-20T00:00:00.000Z', actual_arrival_date: null,
+    container_number: 'MSKU1234567', vessel_name: 'MV Rhine', carrier: 'Maersk',
+    port_of_origin: 'Hamburg', port_of_destination: 'Norfolk', tracking_url: null, notes: null,
+  }
+  const PO = {
+    id: 9, direction: 'incoming', facility_id: 1, facility_name: 'Plant A', supplier_name: null,
+    status: 'confirmed', po_number: 'PO-1041', expected_date: '2026-10-01T00:00:00.000Z',
+    total_value: '4820.50', notes: null, created_at: '2026-09-01T00:00:00.000Z',
+    items: [{ id: 22, purchase_order_id: 9, product_id: 7, product_name: 'UltraClean 40', description: null, quantity: '12.00', unit_price: '401.71' }],
+  }
+
+  const browser = await launch()
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  const puts = []
+  await page.route('**/api/**', async (route) => {
+    const req = route.request()
+    if (req.method() === 'PUT') {
+      let body = null
+      try { body = JSON.parse(req.postData() || '{}') } catch {}
+      puts.push({ url: req.url(), body })
+      return route.fulfill({ status: 200, contentType: 'application/json', body: '{"ok":true}' })
+    }
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      sourcing_order: ORDER, events: [], machines: [], purchase_orders: [PO],
+      facilities: [{ id: 1, name: 'Plant A' }], products: [{ id: 7, name: 'UltraClean 40' }],
+      machine_models: [], sourcing_orders: [], projects: [], metrics: [],
+    }) })
+  })
+
+  // A Postgres date column comes back as an ISO timestamp, which
+  // <input type="date"> cannot display — every date read as unset.
+  await page.goto(`${B}/sourcing/2`, { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(2500)
+  await page.locator('button.btn-secondary').filter({ has: page.locator('svg.lucide-pencil') }).first().click()
+  await page.waitForTimeout(600)
+  const dateKeys = ['order_date', 'deposit_paid_date', 'expected_ship_date', 'actual_ship_date', 'expected_arrival_date', 'actual_arrival_date']
+  const shown = {}
+  for (const k of dateKeys) shown[k] = await page.locator('input[type=date]').nth(dateKeys.indexOf(k)).inputValue()
+  ok('edit form shows the dates the order actually has', shown.order_date === '2026-05-02' && shown.expected_ship_date === '2026-07-01', JSON.stringify(shown))
+  ok('an unset date stays empty', shown.actual_ship_date === '', JSON.stringify(shown))
+
+  await page.locator('input[name=supplier_name]').fill('')
+  await page.locator('form button[type=submit]').click()
+  await page.waitForTimeout(500)
+  ok('clearing the supplier blocks the save', puts.length === 0 && (await page.locator('.field-error').allTextContents()).some((e) => /Supplier name is required/.test(e)))
+
+  await page.locator('input[name=supplier_name]').fill('Acme Ultrasonics')
+  await page.locator('form button[type=submit]').click()
+  await page.waitForTimeout(700)
+  const sPut = puts.find((p) => p.url.includes('sourcing-orders'))
+  ok('saving PUTs the edited order', !!sPut)
+  ok('dates go back as calendar dates, not timestamps', sPut && sPut.body.order_date === '2026-05-02', JSON.stringify(sPut?.body.order_date))
+  ok('untouched columns ride along', sPut && sPut.body.stage === 'in_transit' && sPut.body.facility_id === 1,
+    JSON.stringify({ stage: sPut?.body.stage, facility_id: sPut?.body.facility_id }))
+
+  // The status controls PUT a whole database row back; the route has to accept
+  // pg's own shapes (numerics as strings, dates as timestamps) rather than 400.
+  puts.length = 0
+  await page.goto(`${B}/orders`, { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(2000)
+  const statusSelect = page.locator('select').filter({ has: page.locator('option[value=fulfilled]') }).first()
+  await statusSelect.selectOption('shipped')
+  await page.waitForTimeout(700)
+  const poPut = puts.find((p) => p.url.includes('purchase-orders'))
+  ok('a status change PUTs the order row', !!poPut)
+  if (poPut) {
+    const res = await page.request.fetch(`${B}/api/purchase-orders/9`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, data: poPut.body,
+    })
+    ok('the route accepts a real database row', res.status() !== 400, `${res.status()} ${(await res.text()).slice(0, 160)}`)
+  }
+
+  await browser.close()
+}
+
 let fail = 0
 for (const r of results) {
   if (!r.pass) fail++

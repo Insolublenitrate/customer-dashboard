@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { FacilitySchema, validationError } from '@/lib/schemas'
 
 export async function GET(request, { params }) {
   const { unauthorized } = await requireSession()
@@ -52,7 +53,9 @@ export async function PUT(request, { params }) {
   const { id } = await params
 
   try {
-    const body = await request.json()
+    const parsed = FacilitySchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const body = parsed.data
     const facility = await withClient(async (client) => {
       const result = await client.query(
         `UPDATE facilities SET
@@ -62,13 +65,13 @@ export async function PUT(request, { params }) {
          RETURNING *`,
         [
           body.name,
-          !!body.is_mother_location,
-          body.address || null,
-          body.city || null,
-          body.state || null,
-          body.zip || null,
-          body.region || null,
-          body.regulatory_notes || null,
+          body.is_mother_location,
+          body.address,
+          body.city,
+          body.state,
+          body.zip,
+          body.region,
+          body.regulatory_notes,
           body.status || 'active',
           id,
         ]

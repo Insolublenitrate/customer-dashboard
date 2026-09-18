@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
-import { ConsumptionLogSchema, validationError } from '@/lib/schemas'
+import { ConsumptionLogSchema, StockThresholdSchema, validationError } from '@/lib/schemas'
 import { computeStockForecast } from '@/lib/consumption'
 
 export async function GET(request, { params }) {
@@ -147,10 +147,9 @@ export async function PUT(request, { params }) {
   const { id } = await params
 
   try {
-    const body = await request.json()
-    if (!body.product_id || body.reorder_threshold === undefined) {
-      return NextResponse.json({ error: 'product_id and reorder_threshold are required' }, { status: 400 })
-    }
+    const parsed = StockThresholdSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const body = parsed.data
 
     const stock = await withClient(async (client) => {
       const result = await client.query(
@@ -159,7 +158,7 @@ export async function PUT(request, { params }) {
          ON CONFLICT (facility_id, product_id)
          DO UPDATE SET reorder_threshold = EXCLUDED.reorder_threshold, updated_at = NOW()
          RETURNING *`,
-        [id, body.product_id, body.reorder_threshold, body.unit || 'gallon']
+        [id, body.product_id, body.reorder_threshold, body.unit]
       )
       return result.rows[0]
     })

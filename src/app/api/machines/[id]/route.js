@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { MachineUpdateSchema, validationError } from '@/lib/schemas'
 import { MACHINE_STATUSES } from '@/lib/constants'
 
 export async function GET(request, { params }) {
@@ -55,8 +56,10 @@ export async function PUT(request, { params }) {
   const { id } = await params
 
   try {
-    const body = await request.json()
-    const status = MACHINE_STATUSES.includes(body.status) ? body.status : 'active'
+    const parsed = MachineUpdateSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const body = parsed.data
+    const status = body.status
 
     const machine = await withClient(async (client) => {
       const result = await client.query(
@@ -66,16 +69,16 @@ export async function PUT(request, { params }) {
          WHERE id = $11
          RETURNING *`,
         [
-          body.machine_model_id || null,
-          body.sourcing_order_id || null,
-          body.serial_number || null,
-          body.model || null,
-          body.install_date || null,
+          body.machine_model_id,
+          body.sourcing_order_id,
+          body.serial_number,
+          body.model,
+          body.install_date,
           status,
-          body.default_product_id || null,
-          body.tank_capacity || null,
-          body.fill_frequency_per_week || null,
-          body.notes || null,
+          body.default_product_id,
+          body.tank_capacity,
+          body.fill_frequency_per_week,
+          body.notes,
           id,
         ]
       )

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { MachineModelSchema, validationError } from '@/lib/schemas'
 
 export async function PUT(request, { params }) {
   const { unauthorized } = await requireSession()
@@ -9,13 +10,15 @@ export async function PUT(request, { params }) {
   const { id } = await params
 
   try {
-    const body = await request.json()
+    const parsed = MachineModelSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const body = parsed.data
     const machineModel = await withClient(async (client) => {
       const result = await client.query(
         `UPDATE machine_models SET name = $1, tank_capacity = $2, fill_frequency_per_week = $3, notes = $4
          WHERE id = $5
          RETURNING *`,
-        [body.name, body.tank_capacity, body.fill_frequency_per_week || null, body.notes || null, id]
+        [body.name, body.tank_capacity, body.fill_frequency_per_week, body.notes, id]
       )
       return result.rows[0]
     })

@@ -137,6 +137,12 @@ export const ActionItemSchema = z.object({
   status: enumOf(ACTION_ITEM_STATUSES, 'open'),
 })
 
+// The create route insists on a facility; editing an existing item does not
+// move it, so the base schema leaves the field optional.
+export const ActionItemCreateSchema = ActionItemSchema.extend({
+  facility_id: requiredId('Facility'),
+})
+
 export const ConsumptionLogSchema = z.object({
   product_id: requiredId('Product'),
   machine_id: optionalId,
@@ -204,6 +210,37 @@ export const SourcingOrderSchema = z.object({
   port_of_destination: optionalText,
   tracking_url: optionalText,
   notes: optionalText,
+})
+
+// ---------------------------------------------------------------------------
+// Update variants. An edit never moves a record to a different parent — the
+// PUT statements do not touch those columns — so the parent FK is dropped
+// rather than demanded from a form that has no field for it.
+
+export const ContactUpdateSchema = ContactSchema.omit({ facility_id: true })
+export const ProjectUpdateSchema = ProjectSchema.omit({ facility_id: true })
+export const MachineUpdateSchema = MachineSchema.omit({ facility_id: true, project_id: true })
+
+// Spelled out rather than derived: the purchase-order PUT edits none of the
+// fields the direction rule is about, so carrying that rule over would demand
+// a facility the edit form never shows.
+export const PurchaseOrderUpdateSchema = z.object({
+  status: enumOf(PO_STATUSES, 'draft'),
+  po_number: optionalText,
+  expected_date: optionalDate,
+  total_value: optionalNumber,
+  notes: optionalText,
+  items: z.array(PurchaseOrderItemSchema).nullish().transform((v) => v ?? []),
+})
+
+export const StockThresholdSchema = z.object({
+  product_id: requiredId('Product'),
+  reorder_threshold: requiredNumber('Reorder threshold').refine((v) => v >= 0, 'Reorder threshold cannot be negative'),
+  unit: trimmed.nullish().transform((v) => v || 'gallon'),
+})
+
+export const CommunicationReassignSchema = z.object({
+  facility_id: requiredId('Facility'),
 })
 
 // Turns a failed parse into the shape every route returns on bad input.

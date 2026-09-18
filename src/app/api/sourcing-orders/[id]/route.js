@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { SourcingOrderSchema, validationError } from '@/lib/schemas'
 import { SOURCING_STAGES } from '@/lib/constants'
 
 export async function GET(request, { params }) {
@@ -52,8 +53,10 @@ export async function PUT(request, { params }) {
   const { id } = await params
 
   try {
-    const body = await request.json()
-    const stage = SOURCING_STAGES.includes(body.stage) ? body.stage : 'order_placed'
+    const parsed = SourcingOrderSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const body = parsed.data
+    const stage = body.stage
 
     const sourcingOrder = await withClient(async (client) => {
       const existing = await client.query('SELECT stage FROM machine_sourcing_orders WHERE id = $1', [id])
@@ -70,28 +73,28 @@ export async function PUT(request, { params }) {
          WHERE id = $23
          RETURNING *`,
         [
-          body.project_id || null,
-          body.facility_id || null,
-          body.machine_model_id || null,
+          body.project_id,
+          body.facility_id,
+          body.machine_model_id,
           body.supplier_name,
-          body.supplier_country || null,
+          body.supplier_country,
           body.quantity || 1,
           stage,
-          body.order_date || null,
-          body.deposit_amount || null,
-          body.deposit_paid_date || null,
-          body.total_cost || null,
-          body.expected_ship_date || null,
-          body.actual_ship_date || null,
-          body.expected_arrival_date || null,
-          body.actual_arrival_date || null,
-          body.container_number || null,
-          body.vessel_name || null,
-          body.carrier || null,
-          body.port_of_origin || null,
-          body.port_of_destination || null,
-          body.tracking_url || null,
-          body.notes || null,
+          body.order_date,
+          body.deposit_amount,
+          body.deposit_paid_date,
+          body.total_cost,
+          body.expected_ship_date,
+          body.actual_ship_date,
+          body.expected_arrival_date,
+          body.actual_arrival_date,
+          body.container_number,
+          body.vessel_name,
+          body.carrier,
+          body.port_of_origin,
+          body.port_of_destination,
+          body.tracking_url,
+          body.notes,
           id,
         ]
       )
@@ -99,7 +102,7 @@ export async function PUT(request, { params }) {
       if (stageChanged) {
         await client.query(
           `INSERT INTO sourcing_order_events (sourcing_order_id, stage, notes) VALUES ($1, $2, $3)`,
-          [id, stage, body.stage_note || null]
+          [id, stage, body.stage_note]
         )
       }
 

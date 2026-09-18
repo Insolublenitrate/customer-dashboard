@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { ProductSchema, validationError } from '@/lib/schemas'
 
 export async function PUT(request, { params }) {
   const { unauthorized } = await requireSession()
@@ -9,7 +10,9 @@ export async function PUT(request, { params }) {
   const { id } = await params
 
   try {
-    const body = await request.json()
+    const parsed = ProductSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const body = parsed.data
     const product = await withClient(async (client) => {
       const result = await client.query(
         `UPDATE products SET name = $1, sku = $2, unit = $3, unit_price = $4, supplier_name = $5, reorder_lead_time_days = $6
@@ -17,11 +20,11 @@ export async function PUT(request, { params }) {
          RETURNING *`,
         [
           body.name,
-          body.sku || null,
-          body.unit || 'gallon',
-          body.unit_price || null,
-          body.supplier_name || null,
-          body.reorder_lead_time_days || 14,
+          body.sku,
+          body.unit,
+          body.unit_price,
+          body.supplier_name,
+          body.reorder_lead_time_days,
           id,
         ]
       )

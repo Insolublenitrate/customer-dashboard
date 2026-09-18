@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { PurchaseOrderUpdateSchema, validationError } from '@/lib/schemas'
 import { PO_STATUSES } from '@/lib/constants'
 
 export async function GET(request, { params }) {
@@ -51,8 +52,10 @@ export async function PUT(request, { params }) {
   const { id } = await params
 
   try {
-    const body = await request.json()
-    const status = PO_STATUSES.includes(body.status) ? body.status : 'draft'
+    const parsed = PurchaseOrderUpdateSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const body = parsed.data
+    const status = body.status
 
     const purchaseOrder = await withClient(async (client) => {
       const poResult = await client.query(
@@ -60,7 +63,7 @@ export async function PUT(request, { params }) {
            status = $1, po_number = $2, expected_date = $3, total_value = $4, notes = $5, updated_at = NOW()
          WHERE id = $6
          RETURNING *`,
-        [status, body.po_number || null, body.expected_date || null, body.total_value || null, body.notes || null, id]
+        [status, body.po_number, body.expected_date, body.total_value, body.notes, id]
       )
       if (poResult.rows.length === 0) return null
       const po = poResult.rows[0]

@@ -1,11 +1,16 @@
 'use client'
 
 import { useEffect, useState, use as usePromise } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
 import Link from 'next/link'
 import { ArrowLeft, Pencil, Ship } from 'lucide-react'
 import { SOURCING_STAGES } from '@/lib/constants'
 import { formatStatus } from '@/lib/format'
+import { SourcingOrderSchema } from '@/lib/schemas'
+import { submitJson } from '@/lib/formSubmit'
 import DraftButton from '../../components/DraftButton'
+import FormError from '../../components/FormError'
 
 const editableFields = [
   'supplier_name', 'supplier_country', 'quantity', 'order_date', 'deposit_amount', 'deposit_paid_date',
@@ -13,9 +18,22 @@ const editableFields = [
   'container_number', 'vessel_name', 'carrier', 'port_of_origin', 'port_of_destination', 'tracking_url', 'notes',
 ]
 
+const DATE_FIELDS = new Set(['order_date', 'deposit_paid_date', 'expected_ship_date', 'actual_ship_date', 'expected_arrival_date', 'actual_arrival_date'])
+
+// Postgres hands dates back as ISO timestamps ("2026-05-02T00:00:00.000Z"),
+// which <input type="date"> cannot display — it renders blank. Every date on
+// this order looked unset the moment you opened the edit form.
+function toDateInput(value) {
+  if (!value) return ''
+  const s = String(value)
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : s.slice(0, 10)
+}
+
 function toFormState(order) {
   const form = {}
-  for (const key of editableFields) form[key] = order[key] ?? ''
+  for (const key of editableFields) {
+    form[key] = DATE_FIELDS.has(key) ? toDateInput(order[key]) : (order[key] ?? '')
+  }
   return form
 }
 
@@ -37,7 +55,6 @@ const FIELD_LABELS = {
   tracking_url: 'Tracking link',
 }
 
-const DATE_FIELDS = new Set(['order_date', 'deposit_paid_date', 'expected_ship_date', 'actual_ship_date', 'expected_arrival_date', 'actual_arrival_date'])
 const MONEY_FIELDS = new Set(['deposit_amount', 'total_cost'])
 
 export default function SourcingOrderDetailPage({ params }) {
@@ -45,8 +62,9 @@ export default function SourcingOrderDetailPage({ params }) {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
-  const [form, setForm] = useState(null)
-  const [isSaving, setIsSaving] = useState(false)
+  const { register, handleSubmit, reset, setError, formState: { errors, isSubmitting } } = useForm({
+    resolver: zodResolver(SourcingOrderSchema),
+  })
 
   const fetchData = () => {
     fetch(`/api/sourcing-orders/${id}`)
@@ -71,28 +89,28 @@ export default function SourcingOrderDetailPage({ params }) {
   }
 
   const startEditing = () => {
-    setForm(toFormState(data.sourcing_order))
+    reset(toFormState(data.sourcing_order))
     setIsEditing(true)
   }
 
-  const saveEdits = async (e) => {
-    e.preventDefault()
-    setIsSaving(true)
-    try {
-      await fetch(`/api/sourcing-orders/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...data.sourcing_order, ...form }),
-      })
-      setIsEditing(false)
-      fetchData()
-    } catch (err) {
-      console.error(err)
-      alert('Failed to save changes')
-    } finally {
-      setIsSaving(false)
-    }
-  }
+  const saveEdits = handleSubmit(async (values) => {
+    const result = await submitJson({
+      url: `/api/sourcing-orders/${id}`,
+      method: 'PUT',
+      // The PUT writes every column, and parsing fills in schema fields this
+      // form has no input for — stage, facility_id — as nulls. Merging only the
+      // editable keys keeps those from overwriting the row with defaults.
+      data: {
+        ...data.sourcing_order,
+        ...Object.fromEntries(editableFields.map((k) => [k, values[k]])),
+      },
+      setError,
+      fallback: 'Failed to save changes',
+    })
+    if (!result) return
+    setIsEditing(false)
+    fetchData()
+  })
 
   if (loading) {
     return (
@@ -173,20 +191,27 @@ export default function SourcingOrderDetailPage({ params }) {
           </div>
 
           {isEditing ? (
-            <form onSubmit={saveEdits} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <form onSubmit={saveEdits} noValidate style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <input className="input" placeholder="Supplier name" required value={form.supplier_name}
-                  onChange={(e) => setForm({ ...form, supplier_name: e.target.value })} style={{ flex: '1 1 160px' }} />
-                <input className="input" placeholder="Country" value={form.supplier_country}
-                  onChange={(e) => setForm({ ...form, supplier_country: e.target.value })} style={{ flex: '1 1 120px' }} />
+                <div className="field" style={{ flex: '1 1 160px' }}>
+                  <input className={`input ${errors.supplier_name ? 'input-invalid' : ''}`} placeholder="Supplier name" {...register('supplier_name')} />
+                  <FormError error={errors.supplier_name} />
+                </div>
+                <input className="input" placeholder="Country" {...register('supplier_country')} style={{ flex: '1 1 120px' }} />
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <input className="input" type="number" min="1" placeholder="Quantity" value={form.quantity}
-                  onChange={(e) => setForm({ ...form, quantity: e.target.value })} style={{ flex: '1 1 100px' }} />
-                <input className="input" type="number" step="0.01" placeholder="Total cost ($)" value={form.total_cost}
-                  onChange={(e) => setForm({ ...form, total_cost: e.target.value })} style={{ flex: '1 1 140px' }} />
-                <input className="input" type="number" step="0.01" placeholder="Deposit ($)" value={form.deposit_amount}
-                  onChange={(e) => setForm({ ...form, deposit_amount: e.target.value })} style={{ flex: '1 1 140px' }} />
+                <div className="field" style={{ flex: '1 1 100px' }}>
+                  <input className={`input ${errors.quantity ? 'input-invalid' : ''}`} type="number" min="1" placeholder="Quantity" {...register('quantity')} />
+                  <FormError error={errors.quantity} />
+                </div>
+                <div className="field" style={{ flex: '1 1 140px' }}>
+                  <input className={`input ${errors.total_cost ? 'input-invalid' : ''}`} type="number" step="0.01" placeholder="Total cost ($)" {...register('total_cost')} />
+                  <FormError error={errors.total_cost} />
+                </div>
+                <div className="field" style={{ flex: '1 1 140px' }}>
+                  <input className={`input ${errors.deposit_amount ? 'input-invalid' : ''}`} type="number" step="0.01" placeholder="Deposit ($)" {...register('deposit_amount')} />
+                  <FormError error={errors.deposit_amount} />
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 {[
@@ -196,30 +221,25 @@ export default function SourcingOrderDetailPage({ params }) {
                 ].map(([key, label]) => (
                   <label key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: '0.75rem', flex: '1 1 150px' }} className="text-muted">
                     {label}
-                    <input className="input" type="date" value={form[key]} onChange={(e) => setForm({ ...form, [key]: e.target.value })} />
+                    <input className={`input ${errors[key] ? 'input-invalid' : ''}`} type="date" {...register(key)} />
+                    <FormError error={errors[key]} />
                   </label>
                 ))}
               </div>
               <p className="text-muted" style={{ fontSize: '0.8125rem', margin: '4px 0 0' }}>Shipment</p>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <input className="input" placeholder="Container #" value={form.container_number}
-                  onChange={(e) => setForm({ ...form, container_number: e.target.value })} style={{ flex: '1 1 140px' }} />
-                <input className="input" placeholder="Vessel" value={form.vessel_name}
-                  onChange={(e) => setForm({ ...form, vessel_name: e.target.value })} style={{ flex: '1 1 140px' }} />
-                <input className="input" placeholder="Carrier" value={form.carrier}
-                  onChange={(e) => setForm({ ...form, carrier: e.target.value })} style={{ flex: '1 1 140px' }} />
+                <input className="input" placeholder="Container #" {...register('container_number')} style={{ flex: '1 1 140px' }} />
+                <input className="input" placeholder="Vessel" {...register('vessel_name')} style={{ flex: '1 1 140px' }} />
+                <input className="input" placeholder="Carrier" {...register('carrier')} style={{ flex: '1 1 140px' }} />
               </div>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <input className="input" placeholder="Port of origin" value={form.port_of_origin}
-                  onChange={(e) => setForm({ ...form, port_of_origin: e.target.value })} style={{ flex: '1 1 140px' }} />
-                <input className="input" placeholder="Port of destination" value={form.port_of_destination}
-                  onChange={(e) => setForm({ ...form, port_of_destination: e.target.value })} style={{ flex: '1 1 140px' }} />
+                <input className="input" placeholder="Port of origin" {...register('port_of_origin')} style={{ flex: '1 1 140px' }} />
+                <input className="input" placeholder="Port of destination" {...register('port_of_destination')} style={{ flex: '1 1 140px' }} />
               </div>
-              <input className="input" placeholder="Tracking link" value={form.tracking_url}
-                onChange={(e) => setForm({ ...form, tracking_url: e.target.value })} />
-              <textarea className="input" placeholder="Notes" rows={3} value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-              <button type="submit" className="btn" disabled={isSaving}>{isSaving ? 'Saving…' : 'Save'}</button>
+              <input className="input" placeholder="Tracking link" {...register('tracking_url')} />
+              <textarea className="input" placeholder="Notes" rows={3} {...register('notes')} />
+              <FormError error={errors.root} />
+              <button type="submit" className="btn" disabled={isSubmitting}>{isSubmitting ? 'Saving…' : 'Save'}</button>
             </form>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.9375rem' }}>

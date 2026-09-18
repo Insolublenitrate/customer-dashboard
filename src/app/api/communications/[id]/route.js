@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { CommunicationReassignSchema, validationError } from '@/lib/schemas'
 
 // Used for the manual "link to facility" control when the AI matcher
 // couldn't confidently guess one.
@@ -11,10 +12,9 @@ export async function PUT(request, { params }) {
   const { id } = await params
 
   try {
-    const body = await request.json()
-    if (!body.facility_id) {
-      return NextResponse.json({ error: 'facility_id is required' }, { status: 400 })
-    }
+    const parsed = CommunicationReassignSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const body = parsed.data
 
     const communication = await withClient(async (client) => {
       const result = await client.query(

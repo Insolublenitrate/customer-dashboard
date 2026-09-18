@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
+import { ActionItemCreateSchema, validationError } from '@/lib/schemas'
 import { ACTION_ITEM_STATUSES } from '@/lib/constants'
 
 export async function GET(request) {
@@ -50,10 +51,9 @@ export async function POST(request) {
   if (unauthorized) return unauthorized
 
   try {
-    const body = await request.json()
-    if (!body.facility_id || !body.description) {
-      return NextResponse.json({ error: 'facility_id and description are required' }, { status: 400 })
-    }
+    const parsed = ActionItemCreateSchema.safeParse(await request.json())
+    if (!parsed.success) return NextResponse.json(validationError(parsed), { status: 400 })
+    const body = parsed.data
 
     const actionItem = await withClient(async (client) => {
       const result = await client.query(
@@ -62,11 +62,11 @@ export async function POST(request) {
          RETURNING *`,
         [
           body.facility_id,
-          body.project_id || null,
+          body.project_id,
           body.description,
-          body.owner || null,
-          body.due_date || null,
-          ACTION_ITEM_STATUSES.includes(body.status) ? body.status : 'open',
+          body.owner,
+          body.due_date,
+          body.status,
         ]
       )
       return result.rows[0]
