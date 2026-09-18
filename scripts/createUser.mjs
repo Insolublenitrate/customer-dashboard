@@ -1,15 +1,25 @@
 // One-off admin script: creates a login for this internal tool.
 // There is no public sign-up form on purpose (see src/lib/auth.js).
 //
-// Usage: node scripts/createUser.mjs <email> <password> "<name>"
+// Usage: node scripts/createUser.mjs <email> <password> "<name>" [role]
+//
+// role is `owner` (the default) or `system_admin`. The owner runs the business;
+// the system admin also sees the AI model, key and spend, and is the only role
+// that can change anyone's role.
 
 import dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
 
-const [, , email, password, name] = process.argv
+const [, , email, password, name, roleArg] = process.argv
+const ROLES = ['owner', 'system_admin']
+const role = roleArg || 'owner'
 
 if (!email || !password || !name) {
-  console.error('Usage: node scripts/createUser.mjs <email> <password> "<name>"')
+  console.error('Usage: node scripts/createUser.mjs <email> <password> "<name>" [owner|system_admin]')
+  process.exit(1)
+}
+if (!ROLES.includes(role)) {
+  console.error(`Unknown role "${role}". Use one of: ${ROLES.join(', ')}`)
   process.exit(1)
 }
 if (password.length < 8) {
@@ -27,7 +37,7 @@ const ctx = await auth.$context
 const passwordHash = await ctx.password.hash(password)
 
 const user = await ctx.internalAdapter.createUser(
-  { email: email.toLowerCase(), name, emailVerified: true },
+  { email: email.toLowerCase(), name, emailVerified: true, role },
   { method: 'email-password' }
 )
 await ctx.internalAdapter.linkAccount({
@@ -37,5 +47,5 @@ await ctx.internalAdapter.linkAccount({
   password: passwordHash,
 })
 
-console.log(`Created user ${user.email} (id ${user.id}). They can sign in at /login.`)
+console.log(`Created ${role} ${user.email} (id ${user.id}). They can sign in at /login.`)
 process.exit(0)

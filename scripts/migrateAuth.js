@@ -81,6 +81,30 @@ async function migrate() {
     );
   `)
 
+  // Columns the admin plugin adds. Read out of the installed package's own
+  // schema (node_modules/better-auth/dist/plugins/admin/schema.mjs) rather than
+  // guessed, same as the tables above. ADD COLUMN IF NOT EXISTS keeps this
+  // re-runnable on a database created before roles existed.
+  console.log('Adding admin plugin columns...')
+  await client.query(`
+    ALTER TABLE "user"
+      ADD COLUMN IF NOT EXISTS role TEXT,
+      ADD COLUMN IF NOT EXISTS banned BOOLEAN DEFAULT false,
+      ADD COLUMN IF NOT EXISTS "banReason" TEXT,
+      ADD COLUMN IF NOT EXISTS "banExpires" TIMESTAMPTZ;
+  `)
+  await client.query(`
+    ALTER TABLE "session"
+      ADD COLUMN IF NOT EXISTS "impersonatedBy" TEXT;
+  `)
+
+  // Anyone who existed before roles did runs the business; the installation
+  // role is granted deliberately, never inherited by being early.
+  const backfilled = await client.query(`UPDATE "user" SET role = 'owner' WHERE role IS NULL`)
+  if (backfilled.rowCount > 0) {
+    console.log(`Backfilled ${backfilled.rowCount} existing user(s) to the owner role.`)
+  }
+
   console.log('Auth schema migration complete.')
   client.release()
   process.exit(0)

@@ -2,6 +2,8 @@ import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod'
 import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod'
+import { AI_MODEL } from './aiConfig'
+import { recordUsage } from './aiUsage'
 
 const client = new Anthropic()
 
@@ -44,13 +46,14 @@ export async function analyzeCommunication({ text, pdfBase64, facilityNames }) {
   })
 
   const response = await client.messages.parse({
-    model: 'claude-opus-5',
+    model: AI_MODEL,
     max_tokens: 4096,
     system: SYSTEM_PROMPT,
     messages: [{ role: 'user', content }],
     output_config: { format: zodOutputFormat(ExtractionSchema) },
   })
 
+  await recordUsage({ feature: 'extract', model: response.model, usage: response.usage })
   return response.parsed_output
 }
 
@@ -105,7 +108,7 @@ How to be useful here:
 // would render as a dead link.
 export async function generateBriefing(snapshot) {
   const response = await client.messages.parse({
-    model: 'claude-opus-5',
+    model: AI_MODEL,
     max_tokens: 8000,
     system: ADVISOR_SYSTEM_PROMPT,
     thinking: { type: 'adaptive' },
@@ -118,6 +121,7 @@ export async function generateBriefing(snapshot) {
     output_config: { format: zodOutputFormat(BriefingSchema) },
   })
 
+  await recordUsage({ feature: 'briefing', model: response.model, usage: response.usage })
   return { parsed: response.parsed_output, model: response.model }
 }
 
@@ -264,7 +268,7 @@ export async function answerQuestion({ dbClient, snapshot, history, question }) 
     }))
 
   const finalMessage = await client.beta.messages.toolRunner({
-    model: 'claude-opus-5',
+    model: AI_MODEL,
     max_tokens: 4096,
     thinking: { type: 'adaptive' },
     max_iterations: 8,
@@ -282,6 +286,7 @@ export async function answerQuestion({ dbClient, snapshot, history, question }) 
     .join('\n')
     .trim()
 
+  await recordUsage({ feature: 'ask', model: finalMessage.model, usage: finalMessage.usage })
   return { answer, model: finalMessage.model }
 }
 
@@ -316,7 +321,7 @@ export async function draftMessage({ kind, context, instruction }) {
   const nudge = instruction ? `\n\nThe owner asks for this specifically: ${instruction.slice(0, 500)}` : ''
 
   const response = await client.messages.parse({
-    model: 'claude-opus-5',
+    model: AI_MODEL,
     max_tokens: 4096,
     system: DRAFT_SYSTEM_PROMPT,
     thinking: { type: 'adaptive' },
@@ -329,5 +334,6 @@ export async function draftMessage({ kind, context, instruction }) {
     output_config: { format: zodOutputFormat(DraftSchema) },
   })
 
+  await recordUsage({ feature: 'draft', model: response.model, usage: response.usage })
   return response.parsed_output
 }

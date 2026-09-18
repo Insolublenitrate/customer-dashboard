@@ -268,6 +268,28 @@ async function migrate() {
     );
   `)
 
+
+  // One row per Claude call, so AI spend is a number the system admin can read
+  // rather than a surprise on a card statement. Token counts come straight off
+  // the Messages API response; cost is computed at query time from the rates in
+  // src/lib/aiConfig.js, so a price change does not require rewriting history.
+  console.log('Creating ai_usage...')
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS ai_usage (
+      id SERIAL PRIMARY KEY,
+      feature TEXT NOT NULL,
+      model TEXT NOT NULL,
+      input_tokens INTEGER NOT NULL DEFAULT 0,
+      output_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_creation_input_tokens INTEGER NOT NULL DEFAULT 0,
+      cache_read_input_tokens INTEGER NOT NULL DEFAULT 0,
+      ok BOOLEAN NOT NULL DEFAULT true,
+      error TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `)
+  await client.query(`CREATE INDEX IF NOT EXISTS ai_usage_created_at_idx ON ai_usage (created_at DESC);`)
+
   console.log('Domain schema migration complete.')
   client.release()
   process.exit(0)

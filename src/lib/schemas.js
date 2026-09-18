@@ -63,6 +63,18 @@ import {
   SOURCING_STAGES, CONSUMPTION_LOG_TYPES, ACTION_ITEM_STATUSES,
 } from './constants.js'
 
+export const NewUserSchema = z.object({
+  name: requiredText('Name'),
+  email: requiredText('Email').refine(
+    (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v),
+    'That does not look like an email address'
+  ),
+  // better-auth rejects anything shorter; saying so here beats a 400 with the
+  // library's own wording.
+  password: requiredText('Password').refine((v) => v.length >= 8, 'Use at least 8 characters'),
+  role: enumOf(['system_admin', 'owner'], 'owner'),
+})
+
 export const LoginSchema = z.object({
   email: requiredText('Email').refine(
     (v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v),

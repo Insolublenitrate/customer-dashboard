@@ -10,7 +10,8 @@
     "db:migrate": "node scripts/migrateAuth.js && node scripts/migrate.js",
     "create-user": "node scripts/createUser.mjs",
     "test:schemas": "node scripts/test-schemas.mjs",
-    "test:forms": "node scripts/test-forms.mjs"
+    "test:forms": "node scripts/test-forms.mjs",
+    "test:roles": "node scripts/test-roles.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.126.0",

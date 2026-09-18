@@ -873,3 +873,128 @@ a.glass-card:hover,
   padding: 0;
   flex-shrink: 0;
 }
+
+/* ---------------------------------------------------------------------------
+   Admin
+   --------------------------------------------------------------------------- */
+
+.admin-section-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.admin-section-title {
+  margin: 0;
+  font-size: 1.0625rem;
+}
+
+.admin-people {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Wraps rather than scrolls sideways: the controls drop under the name on a
+   narrow phone instead of hiding off the right edge. */
+.admin-person {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--background-elevated);
+}
+
+.admin-person-name {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+  flex-wrap: wrap;
+}
+
+.admin-person-email {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  overflow-wrap: anywhere;
+}
+
+.admin-person-role {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: var(--muted-faint);
+  font-size: 0.8125rem;
+  margin-top: 2px;
+}
+
+.admin-person-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.admin-role-select {
+  min-height: 44px;
+  font-size: 0.8125rem;
+  padding: 0.4rem 0.5rem;
+}
+
+.admin-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.admin-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.admin-usage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.admin-usage-feature {
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.admin-usage-cost {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.admin-note {
+  font-size: 0.8125rem;
+  margin: 1rem 0 0;
+  line-height: 1.5;
+}
+
+/* Values in the System panel are identifiers and key hints, not short numbers —
+   "claude-opus-5" was being clipped at the tile edge. Smaller, and allowed to
+   break, so the whole string is readable at 320px. */
+.admin-system-strip .metric-strip-value {
+  font-size: 1rem;
+  overflow-wrap: anywhere;
+}
