@@ -1061,3 +1061,91 @@ a.glass-card:hover,
   text-align: left;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
 }
+
+/* ---------------------------------------------------------------------------
+   Long values must wrap, not widen the page.
+
+   A single unbroken string in a record name took a 390px screen to 1,605px of
+   horizontal scroll — measured 2026-09-20 with a 200-character name. Real data
+   does this: a pasted serial, a supplier's SKU, a URL, a compound word. These
+   rules are on the containers rather than on `*` so normal text and numbers are
+   untouched.
+   --------------------------------------------------------------------------- */
+
+.glass-card h1,
+.glass-card h2,
+.glass-card h3,
+.glass-card p,
+.glass-card li,
+.glass-card td,
+.empty-state,
+.dashboard-header h1,
+.dashboard-header p,
+.metric-strip-value,
+.row-list {
+  overflow-wrap: anywhere;
+  /* anywhere, not break-word: break-word still lets an over-long word set the
+     container's min-content width, which is what widened the page. */
+  min-width: 0;
+}
+
+/* Filter-as-you-type over an already-loaded list. See ListSearch.js. */
+.list-search-wrap {
+  margin-bottom: 1rem;
+}
+
+.list-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.list-search-icon {
+  position: absolute;
+  left: 0.7rem;
+  color: var(--muted-faint);
+  pointer-events: none;
+}
+
+.list-search-input {
+  width: 100%;
+  padding-left: 2.25rem;
+  padding-right: 2.75rem;
+}
+
+/* Safari renders its own clear affordance on type=search; this one is ours and
+   works everywhere. */
+.list-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.list-search-clear {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--muted-faint);
+  cursor: pointer;
+}
+
+.list-search-clear:hover {
+  color: var(--foreground);
+}
+
+.list-search-clear:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm);
+}
+
+.list-search-count {
+  color: var(--muted-faint);
+  font-size: 0.8125rem;
+  margin: 0.4rem 0 0;
+}

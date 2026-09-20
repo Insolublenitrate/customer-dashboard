@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Calendar, User } from 'lucide-react'
 import MetricStrip from '../components/MetricStrip'
+import ListSearch from '../components/ListSearch'
 import { apiFetch } from '@/lib/apiFetch'
 
 export default function TasksPage() {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('open')
+  const [query, setQuery] = useState('')
 
   const fetchItems = () => {
     const params = new URLSearchParams()
@@ -35,6 +37,13 @@ export default function TasksPage() {
     })
     fetchItems()
   }
+
+  const q = query.trim().toLowerCase()
+  const visibleItems = q
+    ? items.filter((i) =>
+        [i.description, i.owner, i.facility_name]
+          .some((v) => v && String(v).toLowerCase().includes(q)))
+    : items
 
   return (
     <main className="container">
@@ -63,13 +72,23 @@ export default function TasksPage() {
         ))}
       </div>
 
+      <ListSearch
+        value={query}
+        onChange={setQuery}
+        placeholder="Search description, owner or facility"
+        showing={visibleItems.length}
+        total={items.length}
+      />
+
       {loading ? (
         <div className="loader" />
       ) : items.length === 0 ? (
         <div className="glass empty-state">Nothing here.</div>
+      ) : visibleItems.length === 0 ? (
+        <div className="glass empty-state">Nothing matches &ldquo;{query}&rdquo;.</div>
       ) : (
         <div className="row-list">
-          {items.map((item) => {
+          {visibleItems.map((item) => {
             const isOverdue = item.status === 'open' && item.due_date && new Date(item.due_date) < new Date()
             return (
               <div key={item.id} className={`glass row-card ${item.status === 'done' ? 'is-done' : ''}`}>

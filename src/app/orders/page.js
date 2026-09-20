@@ -8,6 +8,7 @@ import { PO_STATUSES } from '@/lib/constants'
 import { PurchaseOrderSchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
+import ListSearch from '../components/ListSearch'
 import FormError from '../components/FormError'
 import { apiFetch } from '@/lib/apiFetch'
 
@@ -36,6 +37,7 @@ export default function OrdersPage() {
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [directionFilter, setDirectionFilter] = useState('')
+  const [query, setQuery] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { register, handleSubmit, reset, control, setValue, setError, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(PurchaseOrderSchema),
@@ -103,6 +105,13 @@ export default function OrdersPage() {
     fetchAll()
   }
 
+  const q = query.trim().toLowerCase()
+  const visibleOrders = q
+    ? orders.filter((o) =>
+        [o.po_number, o.facility_name, o.supplier_name, o.status]
+          .some((v) => v && String(v).toLowerCase().includes(q)))
+    : orders
+
   return (
     <main className="container">
       <div className="dashboard-header">
@@ -134,13 +143,23 @@ export default function OrdersPage() {
         ))}
       </div>
 
+      <ListSearch
+        value={query}
+        onChange={setQuery}
+        placeholder="Search PO number, facility or supplier"
+        showing={visibleOrders.length}
+        total={orders.length}
+      />
+
       {loading ? (
         <div className="loader" />
+      ) : visibleOrders.length === 0 && orders.length > 0 ? (
+        <div className="glass empty-state">No order matches &ldquo;{query}&rdquo;.</div>
       ) : orders.length === 0 ? (
         <div className="glass empty-state">No orders yet.</div>
       ) : (
         <div className="row-list">
-          {orders.map((o) => (
+          {visibleOrders.map((o) => (
             <div key={o.id} className="glass row-card" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

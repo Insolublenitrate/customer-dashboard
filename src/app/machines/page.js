@@ -10,6 +10,7 @@ import { detergentPerFill } from '@/lib/consumption'
 import { MachineSchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
+import ListSearch from '../components/ListSearch'
 import FormError from '../components/FormError'
 import { apiFetch } from '@/lib/apiFetch'
 
@@ -37,6 +38,7 @@ export default function MachinesPage() {
   const [sourcingOrders, setSourcingOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [facilityFilter, setFacilityFilter] = useState('')
+  const [query, setQuery] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { register, handleSubmit, reset, setValue, control, setError, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(MachineSchema),
@@ -85,6 +87,15 @@ export default function MachinesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [facilityFilter])
 
+  // Derived, not stored: a second copy of the list would go stale the moment
+  // the fetch returns.
+  const q = query.trim().toLowerCase()
+  const visibleMachines = q
+    ? machines.filter((m) =>
+        [m.model, m.serial_number, m.facility_name, m.machine_model_name]
+          .some((v) => v && String(v).toLowerCase().includes(q)))
+    : machines
+
   const onSubmit = async (data) => {
     const result = await submitJson({
       url: '/api/machines',
@@ -125,13 +136,23 @@ export default function MachinesPage() {
         </select>
       </div>
 
+      <ListSearch
+        value={query}
+        onChange={setQuery}
+        placeholder="Search model, serial or facility"
+        showing={visibleMachines.length}
+        total={machines.length}
+      />
+
       {loading ? (
         <div className="loader" />
       ) : machines.length === 0 ? (
         <div className="glass empty-state">No machines yet. Add one once a project is installed.</div>
+      ) : visibleMachines.length === 0 ? (
+        <div className="glass empty-state">No machine matches &ldquo;{query}&rdquo;.</div>
       ) : (
         <div className="metrics-grid">
-          {machines.map((m) => (
+          {visibleMachines.map((m) => (
             <Link key={m.id} href={`/machines/${m.id}`} className="glass glass-card interactive" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <Wrench size={18} color="var(--primary-hover)" />
