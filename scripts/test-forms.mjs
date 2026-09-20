@@ -465,6 +465,182 @@ const launch = () => chromium.launch({ executablePath: process.env.CHROMIUM_PATH
   await browser.close()
 }
 
+// ================ product detail, and the help notes ======================
+{
+  const PRODUCTS = { products: [
+    { id: 7, name: 'UltraClean 40', sku: 'UC-40', unit: 'gallon', unit_price: '18.50', supplier_name: 'Acme Chem', reorder_lead_time_days: 14 },
+    { id: 8, name: 'DeScale HD', sku: null, unit: 'drum', unit_price: null, supplier_name: null, reorder_lead_time_days: 21 },
+  ]}
+  const DETAIL = {
+    product: PRODUCTS.products[0],
+    stock: [
+      { id: 1, facility_id: 1, facility_name: 'Plant A', quantity_on_hand: '120.0', reorder_threshold: '80', unit: 'gallon',
+        days_left: 9, flagged: true, forecast_source: 'usage history' },
+      { id: 2, facility_id: 2, facility_name: 'Plant B', quantity_on_hand: '480.0', reorder_threshold: '100', unit: 'gallon',
+        days_left: 61, flagged: false, forecast_source: 'planned fill schedule' },
+      { id: 3, facility_id: 3, facility_name: 'Plant C', quantity_on_hand: '40.0', reorder_threshold: '10', unit: 'gallon',
+        days_left: null, flagged: false, forecast_source: null },
+    ],
+    machines: [
+      { id: 4, model: 'US-1200XL', serial_number: 'SN-42', status: 'active', tank_capacity: '1200.00', fill_frequency_per_week: '4.0', facility_name: 'Plant A' },
+    ],
+    consumption_logs: [
+      { id: 22, type: 'usage', quantity: '-40', logged_at: '2026-09-15T10:00:00.000Z', facility_name: 'Plant A' },
+      { id: 23, type: 'delivery', quantity: '200', logged_at: '2026-09-10T10:00:00.000Z', facility_name: 'Plant A' },
+    ],
+  }
+
+  const browser = await launch()
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  const errs = []
+  page.on('pageerror', (e) => errs.push(String(e).slice(0, 90)))
+  await page.route('**/api/**', (r) => {
+    const u = r.request().url()
+    if (/\/api\/products\/\d+/.test(u)) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(DETAIL) })
+    if (u.includes('/api/products')) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PRODUCTS) })
+    return r.fulfill({ status: 200, contentType: 'application/json', body: '{"metrics":[]}' })
+  })
+
+  // ---------- list -> detail navigation, like the machines screen ----------
+  await page.goto(`${B}/products`, { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(2200)
+  const card = page.locator('a[href="/products/7"]')
+  ok('product cards are links', await card.count() === 1)
+  await card.click()
+  await page.waitForTimeout(2200)
+  ok('clicking a product opens its detail page', page.url().endsWith('/products/7'), page.url())
+  ok('detail page shows the product name', (await page.locator('h1').textContent()) === 'UltraClean 40')
+  ok('no page errors', errs.length === 0, errs[0] || '')
+
+  const body = await page.evaluate(() => document.body.innerText)
+  ok('shows stock at each facility', body.includes('Plant A') && body.includes('Plant B') && body.includes('Plant C'))
+  ok('shows days left with its basis', body.includes('9 days left, from usage history'), body.match(/days left[^\n]*/)?.[0] || '')
+  ok('names the planned-schedule basis where there is no history', body.includes('61 days left, from planned fill schedule'))
+  ok('says plainly when there is no burn rate at all', body.includes('No burn rate yet'))
+  ok('flags the site that needs reordering', body.includes('Reorder — below threshold'))
+  ok('lists machines running the product', body.includes('US-1200XL'))
+  ok('shows recent movement', body.includes('Usage') && body.includes('Delivery'))
+  ok('rolls up totals across sites', body.includes('640'), body.match(/On hand[^\n]*\n[^\n]*/)?.[0] || '')
+
+  // Cross-links out of the detail page.
+  ok('facility names link to the facility', await page.locator('a[href="/facilities/1"]').count() === 1)
+  ok('machines link to the machine', await page.locator('a[href="/machines/4"]').count() === 1)
+  ok('back link returns to the list', await page.locator('a[href="/products"]').count() >= 1)
+
+  // ---------- the help affordance ----------
+  const tips = page.locator('.helptip-trigger')
+  const tipCount = await tips.count()
+  ok('help triggers are present', tipCount >= 3, `${tipCount}`)
+  ok('no bubble is open initially', await page.locator('.helptip-bubble').count() === 0)
+  ok('trigger reports collapsed state', await tips.first().getAttribute('aria-expanded') === 'false')
+
+  // Tap, not hover — this is the point of the component.
+  await tips.first().click()
+  await page.waitForTimeout(250)
+  ok('tapping opens the note', await page.locator('.helptip-bubble').count() === 1)
+  ok('trigger reports expanded state', await tips.first().getAttribute('aria-expanded') === 'true')
+  ok('the note is readable text', ((await page.locator('.helptip-bubble').textContent()) || '').length > 40)
+  ok('the note is announced as a tooltip', await page.locator('.helptip-bubble').getAttribute('role') === 'tooltip')
+
+  // It must not push the page sideways — standing rule in this app.
+  ok('an open note causes no horizontal scroll at 390px',
+    !(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)))
+  const bb = await page.locator('.helptip-bubble').boundingBox()
+  ok('the note stays on screen', bb && bb.x >= 0 && bb.x + bb.width <= 390 + 1, JSON.stringify(bb))
+
+  // Tap elsewhere closes it.
+  await page.locator('h1').click()
+  await page.waitForTimeout(250)
+  ok('tapping away closes the note', await page.locator('.helptip-bubble').count() === 0)
+
+  // Escape closes it.
+  await tips.first().click()
+  await page.waitForTimeout(200)
+  await page.keyboard.press('Escape')
+  await page.waitForTimeout(200)
+  ok('Escape closes the note', await page.locator('.helptip-bubble').count() === 0)
+
+  // Reachable by keyboard.
+  await tips.first().focus()
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(200)
+  ok('the note opens from the keyboard', await page.locator('.helptip-bubble').count() === 1)
+  await page.keyboard.press('Escape')
+
+  // Tap target big enough for a thumb.
+  const tb = await tips.first().boundingBox()
+  ok('help trigger is at least 32px', tb && tb.width >= 32 && tb.height >= 32, JSON.stringify(tb))
+
+  // ---------- narrowest phone ----------
+  await page.setViewportSize({ width: 320, height: 700 })
+  await page.waitForTimeout(400)
+  await tips.last().click()
+  await page.waitForTimeout(250)
+  ok('no horizontal scroll at 320px with a note open',
+    !(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)))
+  const bb2 = await page.locator('.helptip-bubble').boundingBox()
+  ok('the note stays on screen at 320px', bb2 && bb2.x >= 0 && bb2.x + bb2.width <= 321, JSON.stringify(bb2))
+  await browser.close()
+}
+
+// ============ the same help notes on every screen that carries one ==========
+// They open on tap, not hover, so they are exercised by tapping.
+{
+  const EMPTY = {
+    facilities: [], contacts: [], projects: [], communications: [], action_items: [],
+    machines: [], products: [], machine_models: [], sourcing_orders: [], stock: [],
+    consumption_logs: [], metrics: [], facility: { id: 1, name: 'Toledo Plant', status: 'active' },
+    revenue_trend: [], pipeline_by_stage: [], machine_status_breakdown: [], po_status_breakdown: [],
+    at_risk_facilities: [], sourcing_stage_breakdown: [], facility_leaderboard: [],
+    fleet_demand_forecast: [
+      { facility_name: 'Toledo Plant', planned_weekly: 480, logged_weekly: 310 },
+      { facility_name: 'Odessa Plant', planned_weekly: 240, logged_weekly: 250 },
+    ],
+  }
+
+  const browser = await launch()
+
+  for (const [route, opener] of [
+    ['/machine-models', 'Add model'],
+    ['/facilities/1', null],
+    ['/insights', null],
+    ['/products', 'Add product'],
+  ]) {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+    const errs = []
+    page.on('pageerror', (e) => errs.push(String(e).slice(0, 80)))
+    await page.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(EMPTY) }))
+    await page.goto(B + route, { waitUntil: 'domcontentloaded' })
+    await page.waitForTimeout(2600)
+
+    // Tips inside a create form only exist once the modal is open.
+    if (opener) {
+      await page.getByRole('button', { name: new RegExp(opener, 'i') }).first().click()
+      await page.waitForTimeout(500)
+    }
+
+    const tips = page.locator('.helptip-trigger')
+    const n = await tips.count()
+    ok(`${route}: has help notes`, n > 0, `${n}`)
+    ok(`${route}: no page errors`, errs.length === 0, errs[0] || '')
+
+    if (n > 0) {
+      await tips.first().click()
+      await page.waitForTimeout(350)
+      const bubble = page.locator('.helptip-bubble')
+      ok(`${route}: a note opens`, await bubble.count() === 1)
+      // Inside a modal the bubble must not be hidden behind the backdrop.
+      ok(`${route}: the note is actually visible`, await bubble.isVisible())
+      const box = await bubble.boundingBox()
+      ok(`${route}: the note stays on screen`, box && box.x >= 0 && box.x + box.width <= 391, JSON.stringify(box))
+      ok(`${route}: no horizontal scroll`,
+        !(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)))
+    }
+    await page.close()
+  }
+  await browser.close()
+}
+
 let fail = 0
 for (const r of results) {
   if (!r.pass) fail++

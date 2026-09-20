@@ -998,3 +998,66 @@ a.glass-card:hover,
   font-size: 1rem;
   overflow-wrap: anywhere;
 }
+
+/* ---------------------------------------------------------------------------
+   HelpTip — a tap-to-open note beside a label.
+
+   Opens on click, not hover: on a phone there is no hover, so a :hover bubble
+   or a `title` attribute is invisible to the person this app is built for.
+   --------------------------------------------------------------------------- */
+
+.helptip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.helptip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  /* The icon is 15px; the hit area is 32px so a thumb can land on it without
+     making the surrounding text line taller. */
+  width: 32px;
+  height: 32px;
+  margin: -8px 0 -8px 2px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: 999px;
+  color: var(--muted-faint);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.helptip-trigger:hover,
+.helptip-trigger[aria-expanded='true'] {
+  color: var(--primary-hover);
+}
+
+.helptip-trigger:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -4px;
+}
+
+.helptip-bubble {
+  /* Fixed, and placed by script — see HelpTip.js. A CSS-only bubble anchored to
+     the trigger runs off the left edge when the trigger is near the left of a
+     narrow screen, which is exactly where these labels sit. */
+  position: fixed;
+  z-index: 40;
+  width: max-content;
+  max-width: min(260px, calc(100vw - 1rem));
+  background: var(--background-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.7rem;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.45;
+  color: var(--foreground);
+  white-space: normal;
+  text-align: left;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}

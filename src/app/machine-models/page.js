@@ -8,6 +8,7 @@ import { detergentPerFill } from '@/lib/consumption'
 import { MachineModelSchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
+import HelpTip from '../components/HelpTip'
 import FormError from '../components/FormError'
 import { apiFetch } from '@/lib/apiFetch'
 
@@ -113,11 +114,23 @@ export default function MachineModelsPage() {
               </div>
               <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <div className="field" style={{ flex: '1 1 160px' }}>
-                  <input className={`input ${errors.tank_capacity ? 'input-invalid' : ''}`} type="number" step="any" placeholder="Tank capacity (gal)" {...register('tank_capacity')} />
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <input className={`input ${errors.tank_capacity ? 'input-invalid' : ''}`} type="number" step="any" placeholder="Tank capacity (gal)" {...register('tank_capacity')} style={{ flex: 1, minWidth: 0 }} />
+                    <HelpTip
+                      label="Why tank capacity matters"
+                      text="The whole tank volume, not the detergent in it. Every fill is 10% detergent and 90% water, so a 1,200 gallon tank draws about 120 gallons of detergent each time it is filled. This is what demand planning is built on."
+                    />
+                  </div>
                   <FormError error={errors.tank_capacity} />
                 </div>
                 <div className="field" style={{ flex: '1 1 160px' }}>
-                  <input className={`input ${errors.fill_frequency_per_week ? 'input-invalid' : ''}`} type="number" step="any" placeholder="Typical fills/week" {...register('fill_frequency_per_week')} />
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <input className={`input ${errors.fill_frequency_per_week ? 'input-invalid' : ''}`} type="number" step="any" placeholder="Typical fills/week" {...register('fill_frequency_per_week')} style={{ flex: 1, minWidth: 0 }} />
+                    <HelpTip
+                      label="Why fills per week matters"
+                      text="How often a unit of this size is normally refilled. Together with the tank size it gives the expected weekly detergent draw, which is what forecasts a site that has machines but no logged usage yet."
+                    />
+                  </div>
                   <FormError error={errors.fill_frequency_per_week} />
                 </div>
               </div>

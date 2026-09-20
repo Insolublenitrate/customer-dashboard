@@ -11,6 +11,7 @@ import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../../components/MetricStrip'
 import DraftButton from '../../components/DraftButton'
 import FormError from '../../components/FormError'
+import HelpTip from '../../components/HelpTip'
 import { apiFetch } from '@/lib/apiFetch'
 
 const emptyContact = { name: '', title: '', email: '', phone: '', is_primary: false }
@@ -212,7 +213,13 @@ export default function FacilityDetailPage({ params }) {
         {/* Consumable stock */}
         <div className="glass glass-card">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0 }}>Consumable stock</h3>
+            <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
+              <h3 style={{ margin: 0 }}>Consumable stock</h3>
+              <HelpTip
+                label="How stock and days left work"
+                text="Log a delivery when detergent arrives and usage when it is drawn, and this keeps the on-hand figure. Days left divides what is on hand by the daily burn rate — from the last 60 days of logged usage where there is any, and from the machines' fill schedule where there is not."
+              />
+            </div>
             <button className="btn btn-secondary" onClick={() => setShowLogForm((v) => !v)}>
               <Plus size={14} />
             </button>

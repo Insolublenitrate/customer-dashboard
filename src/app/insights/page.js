@@ -8,6 +8,7 @@ import {
 import { Flame, Trophy, Droplets } from 'lucide-react'
 import { formatCompactCurrency, formatStatus } from '@/lib/format'
 import Briefing from '../components/Briefing'
+import HelpTip from '../components/HelpTip'
 import { apiFetch } from '@/lib/apiFetch'
 
 const MACHINE_STATUS_COLOR = {
@@ -256,6 +257,10 @@ export default function InsightsPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <Droplets size={16} color="var(--accent)" />
               <h3 style={{ margin: 0 }}>Fleet detergent demand — planned vs. logged</h3>
+              <HelpTip
+                label="What the two series mean"
+                text="Planned is what the installed machines should draw: each tank size times 10% times its fills per week. Logged is what was actually recorded as used. Planned running well above logged usually means usage is not being written down, not that the machines stopped."
+              />
             </div>
             <div style={{ display: 'flex', gap: 12, fontSize: '0.75rem' }}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
