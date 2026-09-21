@@ -9,6 +9,9 @@ import { PurchaseOrderSchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
 import ListSearch from '../components/ListSearch'
+import VirtualList from '../components/VirtualList'
+import LoadMore from '../components/LoadMore'
+import { usePagedList } from '@/lib/usePagedList'
 import FormError from '../components/FormError'
 import { apiFetch } from '@/lib/apiFetch'
 
@@ -32,12 +35,9 @@ const STATUS_BADGE = {
 }
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState([])
   const [facilities, setFacilities] = useState([])
   const [products, setProducts] = useState([])
-  const [loading, setLoading] = useState(true)
   const [directionFilter, setDirectionFilter] = useState('')
-  const [query, setQuery] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const { register, handleSubmit, reset, control, setValue, setError, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(PurchaseOrderSchema),
@@ -47,28 +47,32 @@ export default function OrdersPage() {
   // Which party the order names depends on this, so the form watches it.
   const direction = useWatch({ control, name: 'direction' })
 
-  const fetchAll = () => {
-    const params = new URLSearchParams()
-    if (directionFilter) params.set('direction', directionFilter)
+  // Orders are paged and searched server-side; these two only feed the create
+  // form's selects.
+  const {
+    items: orders, total, hasMore, loading, loadingMore, loadMore,
+    query, setQuery, reload: reloadOrders,
+  } = usePagedList({
+    url: '/api/purchase-orders',
+    key: 'purchase_orders',
+    filters: { direction: directionFilter },
+  })
 
+  const fetchAll = () => {
     Promise.all([
-      apiFetch(`/api/purchase-orders?${params}`).then((r) => (r.ok ? r.json() : { purchase_orders: [] })),
       apiFetch('/api/facilities').then((r) => (r.ok ? r.json() : { facilities: [] })),
       apiFetch('/api/products').then((r) => (r.ok ? r.json() : { products: [] })),
     ])
-      .then(([ordersData, facData, prodData]) => {
-        setOrders(ordersData.purchase_orders || [])
+      .then(([facData, prodData]) => {
         setFacilities(facData.facilities || [])
         setProducts(prodData.products || [])
       })
-      .catch((err) => console.error('Failed to load orders:', err))
-      .finally(() => setLoading(false))
+      .catch((err) => console.error('Failed to load reference lists:', err))
   }
 
   useEffect(() => {
     fetchAll()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [directionFilter])
+  }, [])
 
   // Switching direction clears the field the other direction owns, so a value
   // typed under one branch cannot be submitted under the other.
@@ -88,7 +92,7 @@ export default function OrdersPage() {
     if (!result) return
     setIsModalOpen(false)
     reset(emptyForm)
-    fetchAll()
+    reloadOrders()
   }
 
   const closeModal = () => {
@@ -102,15 +106,8 @@ export default function OrdersPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...order, status }),
     })
-    fetchAll()
+    reloadOrders()
   }
-
-  const q = query.trim().toLowerCase()
-  const visibleOrders = q
-    ? orders.filter((o) =>
-        [o.po_number, o.facility_name, o.supplier_name, o.status]
-          .some((v) => v && String(v).toLowerCase().includes(q)))
-    : orders
 
   return (
     <main className="container">
@@ -147,48 +144,55 @@ export default function OrdersPage() {
         value={query}
         onChange={setQuery}
         placeholder="Search PO number, facility or supplier"
-        showing={visibleOrders.length}
-        total={orders.length}
+        showing={orders.length}
+        total={total}
       />
 
       {loading ? (
         <div className="loader" />
-      ) : visibleOrders.length === 0 && orders.length > 0 ? (
-        <div className="glass empty-state">No order matches &ldquo;{query}&rdquo;.</div>
       ) : orders.length === 0 ? (
-        <div className="glass empty-state">No orders yet.</div>
-      ) : (
-        <div className="row-list">
-          {visibleOrders.map((o) => (
-            <div key={o.id} className="glass row-card" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {o.direction === 'incoming' ? (
-                    <ArrowDownToLine size={16} color="var(--success)" />
-                  ) : (
-                    <ArrowUpFromLine size={16} color="var(--accent)" />
-                  )}
-                  <strong>{o.direction === 'incoming' ? (o.facility_name || 'Customer order') : (o.supplier_name || 'Supplier order')}</strong>
-                  {o.po_number && <span className="text-muted" style={{ fontSize: '0.8125rem' }}>#{o.po_number}</span>}
-                </div>
-                <select
-                  className="input"
-                  value={o.status}
-                  onChange={(e) => updateStatus(o, e.target.value)}
-                  style={{ minWidth: 0, padding: '0.35rem 0.5rem', fontSize: '0.75rem', width: 'auto' }}
-                >
-                  {PO_STATUSES.map((s) => <option key={s} value={s}>{formatStatus(s)}</option>)}
-                </select>
-              </div>
-              <div className="text-muted" style={{ fontSize: '0.8125rem', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <span className={`badge ${STATUS_BADGE[o.status] || ''}`}>{formatStatus(o.status)}</span>
-                <span>{o.item_count} item{o.item_count === '1' ? '' : 's'}</span>
-                {o.total_value && <span>${Number(o.total_value).toLocaleString()}</span>}
-                {o.expected_date && <span>Expected {new Date(o.expected_date).toLocaleDateString()}</span>}
-              </div>
-            </div>
-          ))}
+        <div className="glass empty-state">
+          {query ? <>No order matches &ldquo;{query}&rdquo;.</> : 'No orders yet.'}
         </div>
+      ) : (
+        <>
+          <VirtualList
+            items={orders}
+            getKey={(o) => o.id}
+            estimateHeight={150}
+            gap={10}
+            renderItem={(o) => (
+              <div key={o.id} className="glass row-card" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {o.direction === 'incoming' ? (
+                      <ArrowDownToLine size={16} color="var(--success)" />
+                    ) : (
+                      <ArrowUpFromLine size={16} color="var(--accent)" />
+                    )}
+                    <strong>{o.direction === 'incoming' ? (o.facility_name || 'Customer order') : (o.supplier_name || 'Supplier order')}</strong>
+                    {o.po_number && <span className="text-muted" style={{ fontSize: '0.8125rem' }}>#{o.po_number}</span>}
+                  </div>
+                  <select
+                    className="input"
+                    value={o.status}
+                    onChange={(e) => updateStatus(o, e.target.value)}
+                    style={{ minWidth: 0, padding: '0.35rem 0.5rem', fontSize: '0.75rem', width: 'auto' }}
+                  >
+                    {PO_STATUSES.map((s) => <option key={s} value={s}>{formatStatus(s)}</option>)}
+                  </select>
+                </div>
+                <div className="text-muted" style={{ fontSize: '0.8125rem', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                  <span className={`badge ${STATUS_BADGE[o.status] || ''}`}>{formatStatus(o.status)}</span>
+                  <span>{o.item_count} item{o.item_count === '1' ? '' : 's'}</span>
+                  {o.total_value && <span>${Number(o.total_value).toLocaleString()}</span>}
+                  {o.expected_date && <span>Expected {new Date(o.expected_date).toLocaleDateString()}</span>}
+                </div>
+              </div>
+            )}
+          />
+          <LoadMore hasMore={hasMore} loading={loadingMore} onClick={loadMore} showing={orders.length} total={total} />
+        </>
       )}
 
       {isModalOpen && (

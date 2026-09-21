@@ -5,29 +5,22 @@ import Link from 'next/link'
 import { Calendar, User } from 'lucide-react'
 import MetricStrip from '../components/MetricStrip'
 import ListSearch from '../components/ListSearch'
+import VirtualList from '../components/VirtualList'
+import LoadMore from '../components/LoadMore'
+import { usePagedList } from '@/lib/usePagedList'
 import { apiFetch } from '@/lib/apiFetch'
 
 export default function TasksPage() {
-  const [items, setItems] = useState([])
-  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('open')
-  const [query, setQuery] = useState('')
 
-  const fetchItems = () => {
-    const params = new URLSearchParams()
-    if (statusFilter) params.set('status', statusFilter)
-
-    apiFetch(`/api/action-items?${params}`)
-      .then((res) => res.json())
-      .then((data) => setItems(data.action_items || []))
-      .catch((err) => console.error('Failed to load tasks:', err))
-      .finally(() => setLoading(false))
-  }
-
-  useEffect(() => {
-    fetchItems()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter])
+  const {
+    items, total, hasMore, loading, loadingMore, loadMore,
+    query, setQuery, reload: fetchItems,
+  } = usePagedList({
+    url: '/api/action-items',
+    key: 'action_items',
+    filters: { status: statusFilter },
+  })
 
   const toggleItem = async (item) => {
     await apiFetch(`/api/action-items/${item.id}`, {
@@ -37,13 +30,6 @@ export default function TasksPage() {
     })
     fetchItems()
   }
-
-  const q = query.trim().toLowerCase()
-  const visibleItems = q
-    ? items.filter((i) =>
-        [i.description, i.owner, i.facility_name]
-          .some((v) => v && String(v).toLowerCase().includes(q)))
-    : items
 
   return (
     <main className="container">
@@ -76,55 +62,64 @@ export default function TasksPage() {
         value={query}
         onChange={setQuery}
         placeholder="Search description, owner or facility"
-        showing={visibleItems.length}
-        total={items.length}
+        showing={items.length}
+        total={total}
       />
 
       {loading ? (
         <div className="loader" />
       ) : items.length === 0 ? (
-        <div className="glass empty-state">Nothing here.</div>
-      ) : visibleItems.length === 0 ? (
-        <div className="glass empty-state">Nothing matches &ldquo;{query}&rdquo;.</div>
+        // With search on the server, an empty list means one of two different
+        // things and the message has to say which.
+        <div className="glass empty-state">
+          {query ? <>Nothing matches &ldquo;{query}&rdquo;.</> : 'Nothing here.'}
+        </div>
       ) : (
-        <div className="row-list">
-          {visibleItems.map((item) => {
-            const isOverdue = item.status === 'open' && item.due_date && new Date(item.due_date) < new Date()
-            return (
-              <div key={item.id} className={`glass row-card ${item.status === 'done' ? 'is-done' : ''}`}>
-                <input
-                  type="checkbox"
-                  checked={item.status === 'done'}
-                  onChange={() => toggleItem(item)}
-                  style={{ marginTop: 3, width: 18, height: 18, flexShrink: 0, accentColor: 'var(--primary)' }}
-                />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ textDecoration: item.status === 'done' ? 'line-through' : 'none' }}>
-                    {item.description}
-                  </p>
-                  <div style={{ display: 'flex', gap: '0.875rem', flexWrap: 'wrap', marginTop: '0.5rem', fontSize: '0.8125rem' }} className="text-muted">
-                    <Link href={`/facilities/${item.facility_id}`} className="badge" style={{ textDecoration: 'none' }}>
-                      {item.facility_name}
-                    </Link>
-                    {item.owner && (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                        <User size={13} /> {item.owner}
-                      </span>
-                    )}
-                    {item.due_date && (
-                      <span
-                        className={isOverdue ? undefined : 'text-muted'}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: isOverdue ? 'var(--danger)' : undefined }}
-                      >
-                        <Calendar size={13} /> {new Date(item.due_date).toLocaleDateString()}
-                      </span>
-                    )}
+        <>
+          <VirtualList
+            items={items}
+            getKey={(item) => item.id}
+            estimateHeight={116}
+            gap={10}
+            renderItem={(item) => {
+              const isOverdue = item.status === 'open' && item.due_date && new Date(item.due_date) < new Date()
+              return (
+                <div key={item.id} className={`glass row-card ${item.status === 'done' ? 'is-done' : ''}`}>
+                  <input
+                    type="checkbox"
+                    checked={item.status === 'done'}
+                    onChange={() => toggleItem(item)}
+                    style={{ marginTop: 3, width: 18, height: 18, flexShrink: 0, accentColor: 'var(--primary)' }}
+                  />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ textDecoration: item.status === 'done' ? 'line-through' : 'none' }}>
+                      {item.description}
+                    </p>
+                    <div style={{ display: 'flex', gap: '0.875rem', flexWrap: 'wrap', marginTop: '0.5rem', fontSize: '0.8125rem' }} className="text-muted">
+                      <Link href={`/facilities/${item.facility_id}`} className="badge" style={{ textDecoration: 'none' }}>
+                        {item.facility_name}
+                      </Link>
+                      {item.owner && (
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <User size={13} /> {item.owner}
+                        </span>
+                      )}
+                      {item.due_date && (
+                        <span
+                          className={isOverdue ? undefined : 'text-muted'}
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: isOverdue ? 'var(--danger)' : undefined }}
+                        >
+                          <Calendar size={13} /> {new Date(item.due_date).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )
-          })}
-        </div>
+              )
+            }}
+          />
+          <LoadMore hasMore={hasMore} loading={loadingMore} onClick={loadMore} showing={items.length} total={total} />
+        </>
       )}
     </main>
   )

@@ -1149,3 +1149,16 @@ a.glass-card:hover,
   font-size: 0.8125rem;
   margin: 0.4rem 0 0;
 }
+
+.load-more {
+  display: flex;
+  justify-content: center;
+  margin: 1.25rem 0 2rem;
+}
+
+.load-more-end {
+  text-align: center;
+  color: var(--muted-faint);
+  font-size: 0.8125rem;
+  margin: 1.25rem 0 2rem;
+}

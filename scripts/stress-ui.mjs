@@ -3,8 +3,9 @@
 // Findings on 2026-09-20 that turned into fixes:
 //   - a 200-character unbroken name took a 390px screen to 1,605px of
 //     horizontal scroll (fixed by overflow-wrap rules in globals.css)
-//   - 600 machines render a page 101,700px tall, about 240 phone screens, with
-//     no way to reach one (fixed by ListSearch)
+//   - 600 machines built 6,205 DOM nodes and a page 101,700px tall, about 240
+//     phone screens, with no way to reach one (fixed by server paging, a
+//     server-side search box, and virtualized rendering — 6,205 nodes -> ~315)
 // And two that were already sound, which is worth keeping a check on:
 //   - markup in a record name is escaped, not executed
 //   - three fast taps on Save create one record, not three
@@ -48,20 +49,39 @@ for (const [route, label, count] of [['/machines', 'machines', 600], ['/orders',
   const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
   const errs = []
   page.on('pageerror', (e) => errs.push(String(e).slice(0, 70)))
-  await page.route('**/api/**', (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(BIG) }))
+  // Honour limit/offset, or this measures a path the app no longer takes.
+  await page.route('**/api/**', (r) => {
+    const u = new URL(r.request().url())
+    const key = { '/api/machines': 'machines', '/api/purchase-orders': 'purchase_orders',
+                  '/api/action-items': 'action_items' }[u.pathname]
+    if (!key) return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(BIG) })
+    const limit = Number(u.searchParams.get('limit') || 50)
+    const offset = Number(u.searchParams.get('offset') || 0)
+    const rows = BIG[key].slice(offset, offset + limit)
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      ...BIG, [key]: rows, items: rows, total: BIG[key].length, limit, offset,
+      has_more: offset + rows.length < BIG[key].length }) })
+  })
   const t0 = Date.now()
   await page.goto(B + route, { waitUntil: 'domcontentloaded' })
   // Wait until the rows are actually on screen.
-  await page.waitForFunction(() => document.querySelectorAll('.glass-card, .row-list > *, tr').length > 50, null, { timeout: 30000 }).catch(() => {})
+  await page.waitForFunction(
+    () => document.querySelectorAll('.glass-card, .row-card, .row-list > *').length > 3,
+    null, { timeout: 20000 }).catch(() => {})
   const ms = Date.now() - t0
   await page.waitForTimeout(800)
   const stats = await page.evaluate(() => ({
     nodes: document.querySelectorAll('*').length,
+    rendered: document.querySelectorAll('.glass-card, .row-card').length,
     height: document.documentElement.scrollHeight,
     xscroll: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
   }))
-  note(`${route} with ${count} rows`, `${ms} ms to render · ${stats.nodes.toLocaleString()} DOM nodes · ${(stats.height/1000).toFixed(1)}k px tall`,
-    errs.length ? `ERRORS: ${errs[0]}` : (stats.xscroll ? 'H-SCROLL' : ''))
+  // The DOM node count is the number that matters. Page height stays
+  // proportional to the rows loaded so far, by design — that is what makes the
+  // scrollbar tell the truth about how much list there is.
+  note(`${route}, ${count} rows in the data`,
+    `${ms} ms · ${stats.nodes.toLocaleString()} DOM nodes · ${stats.rendered} rows rendered · ${(stats.height/1000).toFixed(1)}k px tall`,
+    errs.length ? `ERRORS: ${errs[0]}` : (stats.xscroll ? 'H-SCROLL' : (stats.nodes > 1500 ? 'DOM TOO BIG' : '')))
   await page.close()
 }
 

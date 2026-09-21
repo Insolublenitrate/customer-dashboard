@@ -3,6 +3,7 @@ import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
 import { PurchaseOrderSchema, validationError } from '@/lib/schemas'
 import { PO_DIRECTIONS, PO_STATUSES } from '@/lib/constants'
+import { readPaging, searchClause, pagedResult } from '@/lib/pagination'
 
 export async function GET(request) {
   const { unauthorized } = await requireSession()
@@ -11,12 +12,14 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const direction = searchParams.get('direction')
   const status = searchParams.get('status')
+  const { limit, offset, q } = readPaging(searchParams)
 
   try {
     const rows = await withClient(async (client) => {
       let query = `
         SELECT po.*, f.name AS facility_name,
-          (SELECT COUNT(*) FROM purchase_order_items i WHERE i.purchase_order_id = po.id) AS item_count
+          (SELECT COUNT(*) FROM purchase_order_items i WHERE i.purchase_order_id = po.id) AS item_count,
+          COUNT(*) OVER() AS total_count
         FROM purchase_orders po
         LEFT JOIN facilities f ON f.id = po.facility_id
         WHERE 1=1
@@ -35,12 +38,20 @@ export async function GET(request) {
         i++
       }
 
-      query += ' ORDER BY po.created_at DESC'
+      const search = searchClause(['po.po_number', 'f.name', 'po.supplier_name'], q, i)
+      query += search.sql
+      params.push(...search.params)
+
+      // id breaks ties on created_at so a row cannot straddle two pages.
+      query += ' ORDER BY po.created_at DESC, po.id DESC'
+      params.push(limit, offset)
+      query += ` LIMIT $${params.length - 1} OFFSET $${params.length}`
       const result = await client.query(query, params)
       return result.rows
     })
 
-    return NextResponse.json({ purchase_orders: rows })
+    const page = pagedResult(rows, { limit, offset })
+    return NextResponse.json({ purchase_orders: page.items, ...page })
   } catch (error) {
     console.error('Failed to list purchase orders:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

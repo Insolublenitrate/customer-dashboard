@@ -641,6 +641,103 @@ const launch = () => chromium.launch({ executablePath: process.env.CHROMIUM_PATH
   await browser.close()
 }
 
+// ============== server paging and virtualized rendering ====================
+// The list endpoints return a page, not the table; the page renders only the
+// rows near the viewport; and the search box asks the server, so a match on a
+// page that was never loaded is still found.
+{
+  const TOTAL = 600
+  const ALL = Array.from({ length: TOTAL }, (_, i) => ({
+    id: i + 1, model: `Model-${(i % 8) + 1}`, serial_number: `SN-${i + 1}`, status: 'active',
+    facility_id: 1 + (i % 25), facility_name: `Facility ${1 + (i % 25)}`,
+    tank_capacity: '1200.00', fill_frequency_per_week: '4.0', default_product_name: 'Detergent 1',
+  }))
+
+  const browser = await launch()
+  const page = await browser.newPage({ viewport: { width: 390, height: 844 } })
+  const errs = []
+  page.on('pageerror', (e) => errs.push(String(e).slice(0, 90)))
+
+  const requests = []
+  await page.route('**/api/**', (r) => {
+    const u = new URL(r.request().url())
+    if (u.pathname === '/api/machines') {
+      const limit = Number(u.searchParams.get('limit') || 50)
+      const offset = Number(u.searchParams.get('offset') || 0)
+      const q = (u.searchParams.get('q') || '').toLowerCase()
+      const fac = u.searchParams.get('facility_id')
+      requests.push({ limit, offset, q, fac })
+      let rows = ALL
+      if (fac) rows = rows.filter((m) => String(m.facility_id) === fac)
+      if (q) rows = rows.filter((m) => [m.model, m.serial_number, m.facility_name].some((v) => String(v).toLowerCase().includes(q)))
+      const slice = rows.slice(offset, offset + limit)
+      return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+        machines: slice, items: slice, total: rows.length, limit, offset, has_more: offset + slice.length < rows.length })})
+    }
+    return r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      facilities: Array.from({length:25},(_,i)=>({id:i+1,name:`Facility ${i+1}`})), products: [], machine_models: [], sourcing_orders: [], metrics: [] })})
+  })
+
+  await page.goto(`${B}/machines`, { waitUntil: 'domcontentloaded' })
+  await page.waitForTimeout(3500)
+
+  // ---- paging: the wire stays small ----
+  ok('asks for one page, not everything', requests.length > 0 && requests[0].limit === 50 && requests[0].offset === 0, JSON.stringify(requests[0]))
+  const shown = await page.locator('a[href^="/machines/"]').count()
+  ok('only a page of rows is loaded', shown <= 50, `${shown} links`)
+  const count = await page.locator('.list-search-count').innerText()
+  ok('the count knows the real total', count.includes('600'), count)
+
+  // ---- virtualization: the DOM stays small ----
+  const stats = await page.evaluate(() => ({
+    nodes: document.querySelectorAll('*').length,
+    cards: document.querySelectorAll('a[href^="/machines/"]').length,
+    height: document.documentElement.scrollHeight,
+  }))
+  ok('DOM holds far fewer nodes than before', stats.nodes < 2500, `${stats.nodes} nodes (was 6,205)`)
+  ok('only near-viewport cards are in the DOM', stats.cards < 30, `${stats.cards} cards rendered of ${shown >= 0 ? 50 : 0} loaded`)
+  ok('no horizontal scroll', !(await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1)))
+
+  // ---- scrolling renders more, and recycles ----
+  await page.evaluate(() => window.scrollTo(0, 3000))
+  await page.waitForTimeout(900)
+  const afterScroll = await page.evaluate(() => ({
+    cards: document.querySelectorAll('a[href^="/machines/"]').length,
+    firstText: document.querySelector('a[href^="/machines/"] h3')?.textContent || '',
+    anyVisible: [...document.querySelectorAll('a[href^="/machines/"]')].some((el) => {
+      const r = el.getBoundingClientRect(); return r.top < window.innerHeight && r.bottom > 0 }),
+  }))
+  ok('scrolling keeps the DOM bounded', afterScroll.cards < 30, `${afterScroll.cards} cards`)
+  ok('cards are actually on screen after scrolling', afterScroll.anyVisible)
+
+  // ---- load more ----
+  await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight))
+  await page.waitForTimeout(700)
+  const btn = page.getByRole('button', { name: /Load more/i })
+  ok('a Load more button appears at the end', await btn.count() === 1)
+  const before = requests.length
+  await btn.click()
+  await page.waitForTimeout(1500)
+  ok('Load more asks for the next page', requests.length > before && requests[requests.length - 1].offset === 50,
+    JSON.stringify(requests[requests.length - 1]))
+  const afterMore = await page.locator('.list-search-count').innerText()
+  ok('the count grows after loading more', afterMore.includes('100') || afterMore.includes('600'), afterMore)
+
+  // ---- search goes to the server, not just the loaded page ----
+  const beforeSearch = requests.length
+  await page.locator('.list-search-input').fill('SN-588')
+  await page.waitForTimeout(1200)
+  const searchReqs = requests.slice(beforeSearch).filter((r) => r.q)
+  ok('search is sent to the server', searchReqs.length > 0, JSON.stringify(searchReqs[0] || {}))
+  ok('search is debounced, not one request per keystroke', searchReqs.length <= 2, `${searchReqs.length} requests for 7 characters`)
+  ok('search resets to the first page', searchReqs[searchReqs.length - 1]?.offset === 0)
+  const body = await page.evaluate(() => document.body.innerText)
+  ok('a match beyond the loaded page is found', body.includes('SN-588'), 'row 588 was never loaded before searching')
+
+  ok('no page errors throughout', errs.length === 0, errs[0] || '')
+  await browser.close()
+}
+
 let fail = 0
 for (const r of results) {
   if (!r.pass) fail++

@@ -11,6 +11,9 @@ import { MachineSchema } from '@/lib/schemas'
 import { submitJson } from '@/lib/formSubmit'
 import MetricStrip from '../components/MetricStrip'
 import ListSearch from '../components/ListSearch'
+import VirtualList from '../components/VirtualList'
+import LoadMore from '../components/LoadMore'
+import { usePagedList } from '@/lib/usePagedList'
 import FormError from '../components/FormError'
 import { apiFetch } from '@/lib/apiFetch'
 
@@ -31,15 +34,23 @@ const STATUS_BADGE = {
 }
 
 export default function MachinesPage() {
-  const [machines, setMachines] = useState([])
   const [facilities, setFacilities] = useState([])
   const [products, setProducts] = useState([])
   const [machineModels, setMachineModels] = useState([])
   const [sourcingOrders, setSourcingOrders] = useState([])
-  const [loading, setLoading] = useState(true)
   const [facilityFilter, setFacilityFilter] = useState('')
-  const [query, setQuery] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // The machine list is paged and searched server-side; the facility filter is
+  // passed through so the two compose in SQL rather than fighting each other.
+  const {
+    items: machines, total, hasMore, loading, loadingMore, loadMore,
+    query, setQuery, reload: reloadMachines,
+  } = usePagedList({
+    url: '/api/machines',
+    key: 'machines',
+    filters: { facility_id: facilityFilter },
+  })
   const { register, handleSubmit, reset, setValue, control, setError, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(MachineSchema),
     defaultValues: emptyForm,
@@ -48,26 +59,22 @@ export default function MachinesPage() {
   // and the React Compiler cannot memoize it (react-hooks/incompatible-library).
   const tankCapacity = useWatch({ control, name: 'tank_capacity' })
 
+  // Only the reference lists that feed the create form's selects. The machine
+  // list itself is the hook's job.
   const fetchAll = () => {
-    const params = new URLSearchParams()
-    if (facilityFilter) params.set('facility_id', facilityFilter)
-
     Promise.all([
-      apiFetch(`/api/machines?${params}`).then((r) => (r.ok ? r.json() : { machines: [] })),
       apiFetch('/api/facilities').then((r) => (r.ok ? r.json() : { facilities: [] })),
       apiFetch('/api/products').then((r) => (r.ok ? r.json() : { products: [] })),
       apiFetch('/api/machine-models').then((r) => (r.ok ? r.json() : { machine_models: [] })),
       apiFetch('/api/sourcing-orders').then((r) => (r.ok ? r.json() : { sourcing_orders: [] })),
     ])
-      .then(([machinesData, facData, prodData, modelsData, sourcingData]) => {
-        setMachines(machinesData.machines || [])
+      .then(([facData, prodData, modelsData, sourcingData]) => {
         setFacilities(facData.facilities || [])
         setProducts(prodData.products || [])
         setMachineModels(modelsData.machine_models || [])
         setSourcingOrders(sourcingData.sourcing_orders || [])
       })
-      .catch((err) => console.error('Failed to load machines:', err))
-      .finally(() => setLoading(false))
+      .catch((err) => console.error('Failed to load reference lists:', err))
   }
 
   // Picking a catalog model prefills tank size/fill cadence and the display
@@ -84,17 +91,7 @@ export default function MachinesPage() {
 
   useEffect(() => {
     fetchAll()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [facilityFilter])
-
-  // Derived, not stored: a second copy of the list would go stale the moment
-  // the fetch returns.
-  const q = query.trim().toLowerCase()
-  const visibleMachines = q
-    ? machines.filter((m) =>
-        [m.model, m.serial_number, m.facility_name, m.machine_model_name]
-          .some((v) => v && String(v).toLowerCase().includes(q)))
-    : machines
+  }, [])
 
   const onSubmit = async (data) => {
     const result = await submitJson({
@@ -106,7 +103,7 @@ export default function MachinesPage() {
     if (!result) return
     setIsModalOpen(false)
     reset(emptyForm)
-    fetchAll()
+    reloadMachines()
   }
 
   const closeModal = () => {
@@ -140,41 +137,50 @@ export default function MachinesPage() {
         value={query}
         onChange={setQuery}
         placeholder="Search model, serial or facility"
-        showing={visibleMachines.length}
-        total={machines.length}
+        showing={machines.length}
+        total={total}
       />
 
       {loading ? (
         <div className="loader" />
       ) : machines.length === 0 ? (
-        <div className="glass empty-state">No machines yet. Add one once a project is installed.</div>
-      ) : visibleMachines.length === 0 ? (
-        <div className="glass empty-state">No machine matches &ldquo;{query}&rdquo;.</div>
-      ) : (
-        <div className="metrics-grid">
-          {visibleMachines.map((m) => (
-            <Link key={m.id} href={`/machines/${m.id}`} className="glass glass-card interactive" style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <Wrench size={18} color="var(--primary-hover)" />
-                <h3 style={{ margin: 0 }}>{m.model || 'Unnamed unit'}</h3>
-              </div>
-              <p className="text-muted" style={{ fontSize: '0.875rem', marginBottom: 12 }}>
-                {m.facility_name}{m.serial_number ? ` · SN ${m.serial_number}` : ''}
-              </p>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <span className={`badge ${STATUS_BADGE[m.status] || ''}`}>{formatStatus(m.status)}</span>
-                {m.default_product_name && <span className="text-muted" style={{ fontSize: '0.8125rem' }}>{m.default_product_name}</span>}
-              </div>
-              {(m.tank_capacity || m.fill_frequency_per_week) && (
-                <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: 8 }}>
-                  {m.tank_capacity ? `${Number(m.tank_capacity).toLocaleString()} gal tank` : ''}
-                  {m.tank_capacity && m.fill_frequency_per_week ? ' · ' : ''}
-                  {m.fill_frequency_per_week ? `~${m.fill_frequency_per_week} fills/wk` : ''}
-                </p>
-              )}
-            </Link>
-          ))}
+        <div className="glass empty-state">
+          {query
+            ? <>No machine matches &ldquo;{query}&rdquo;.</>
+            : 'No machines yet. Add one once a project is installed.'}
         </div>
+      ) : (
+        <>
+          <VirtualList
+            items={machines}
+            getKey={(m) => m.id}
+            minColumnWidth={200}
+            estimateHeight={168}
+            renderItem={(m) => (
+              <Link href={`/machines/${m.id}`} className="glass glass-card interactive" style={{ textDecoration: 'none', color: 'inherit', display: 'block', height: '100%', marginBottom: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <Wrench size={18} color="var(--primary-hover)" />
+                  <h3 style={{ margin: 0 }}>{m.model || 'Unnamed unit'}</h3>
+                </div>
+                <p className="text-muted" style={{ fontSize: '0.875rem', marginBottom: 12 }}>
+                  {m.facility_name}{m.serial_number ? ` · SN ${m.serial_number}` : ''}
+                </p>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span className={`badge ${STATUS_BADGE[m.status] || ''}`}>{formatStatus(m.status)}</span>
+                  {m.default_product_name && <span className="text-muted" style={{ fontSize: '0.8125rem' }}>{m.default_product_name}</span>}
+                </div>
+                {(m.tank_capacity || m.fill_frequency_per_week) && (
+                  <p className="text-muted" style={{ fontSize: '0.75rem', marginTop: 8 }}>
+                    {m.tank_capacity ? `${Number(m.tank_capacity).toLocaleString()} gal tank` : ''}
+                    {m.tank_capacity && m.fill_frequency_per_week ? ' · ' : ''}
+                    {m.fill_frequency_per_week ? `~${m.fill_frequency_per_week} fills/wk` : ''}
+                  </p>
+                )}
+              </Link>
+            )}
+          />
+          <LoadMore hasMore={hasMore} loading={loadingMore} onClick={loadMore} showing={machines.length} total={total} />
+        </>
       )}
 
       {isModalOpen && (

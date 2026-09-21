@@ -3,6 +3,7 @@ import { withClient } from '@/lib/db'
 import { requireSession } from '@/lib/session'
 import { ActionItemCreateSchema, validationError } from '@/lib/schemas'
 import { ACTION_ITEM_STATUSES } from '@/lib/constants'
+import { readPaging, searchClause, pagedResult } from '@/lib/pagination'
 
 export async function GET(request) {
   const { unauthorized } = await requireSession()
@@ -11,11 +12,12 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status')
   const facilityId = searchParams.get('facility_id')
+  const { limit, offset, q } = readPaging(searchParams)
 
   try {
     const rows = await withClient(async (client) => {
       let query = `
-        SELECT a.*, f.name AS facility_name
+        SELECT a.*, f.name AS facility_name, COUNT(*) OVER() AS total_count
         FROM action_items a
         JOIN facilities f ON f.id = a.facility_id
         WHERE 1=1
@@ -34,12 +36,21 @@ export async function GET(request) {
         i++
       }
 
-      query += ` ORDER BY (a.status = 'open') DESC, a.due_date ASC NULLS LAST, a.created_at DESC`
+      const search = searchClause(['a.description', 'a.owner', 'f.name'], q, i)
+      query += search.sql
+      params.push(...search.params)
+
+      // id breaks ties so a row cannot appear on two pages, or on none.
+      query += ` ORDER BY (a.status = 'open') DESC, a.due_date ASC NULLS LAST, a.created_at DESC, a.id DESC`
+      params.push(limit, offset)
+      query += ` LIMIT $${params.length - 1} OFFSET $${params.length}`
+
       const result = await client.query(query, params)
       return result.rows
     })
 
-    return NextResponse.json({ action_items: rows })
+    const page = pagedResult(rows, { limit, offset })
+    return NextResponse.json({ action_items: page.items, ...page })
   } catch (error) {
     console.error('Failed to list action items:', error)
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
